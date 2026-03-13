@@ -20,6 +20,7 @@ ob_start();
         </div>
     </div>
     
+    <!-- OCULTO TEMPORALMENTE - Información Financiera
     <?php if (isset($stats['financial'])): ?>
     <div class="bg-white rounded-lg shadow p-4 md:p-6">
         <div class="flex items-center justify-between">
@@ -51,6 +52,7 @@ ob_start();
         </div>
     </div>
     <?php endif; ?>
+    -->
 </div>
 
 <!-- Gráficas -->

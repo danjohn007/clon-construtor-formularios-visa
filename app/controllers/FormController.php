@@ -128,35 +128,11 @@ class FormController extends BaseController {
         }
         
         try {
-            // Generate unique public token with retry logic
-            $maxRetries = 5;
-            $publicToken = null;
-            
-            for ($i = 0; $i < $maxRetries; $i++) {
-                $publicToken = bin2hex(random_bytes(32));
-                
-                // Check if token already exists
-                $checkStmt = $this->db->prepare("SELECT id FROM forms WHERE public_token = ?");
-                $checkStmt->execute([$publicToken]);
-                
-                if (!$checkStmt->fetch()) {
-                    // Token is unique, break the loop
-                    break;
-                }
-                
-                // If we're on the last retry and still have a duplicate, log it
-                if ($i === $maxRetries - 1) {
-                    error_log("Failed to generate unique public_token after $maxRetries attempts");
-                    $_SESSION['error'] = 'Error al generar token único. Por favor, intente nuevamente.';
-                    $this->redirect('/formularios/crear');
-                    return;
-                }
-            }
-            
+            // Insert form - todos los formularios son públicos por defecto
             $stmt = $this->db->prepare("
                 INSERT INTO forms (name, description, type, subtype, fields_json, cost, paypal_enabled, 
-                                   pagination_enabled, pages_json, public_token, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   pagination_enabled, pages_json, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $name,
@@ -168,7 +144,6 @@ class FormController extends BaseController {
                 $paypalEnabled,
                 $paginationEnabled,
                 $pagesJson,
-                $publicToken,
                 $_SESSION['user_id']
             ]);
             
@@ -182,13 +157,7 @@ class FormController extends BaseController {
             
         } catch (PDOException $e) {
             error_log("Error al crear formulario: " . $e->getMessage());
-            
-            // Check if it's a duplicate entry error
-            if ($e->getCode() == 23000 && strpos($e->getMessage(), 'Duplicate entry') !== false) {
-                $_SESSION['error'] = 'Error: Token duplicado detectado. Por favor, intente nuevamente.';
-            } else {
-                $_SESSION['error'] = 'Error al crear formulario';
-            }
+            $_SESSION['error'] = 'Error al crear formulario: ' . $e->getMessage();
             $this->redirect('/formularios/crear');
         }
     }
@@ -227,6 +196,8 @@ class FormController extends BaseController {
         $type = $_POST['type'] ?? '';
         $subtype = trim($_POST['subtype'] ?? '');
         $fieldsJson = $_POST['fields_json'] ?? '';
+        $paginationEnabled = isset($_POST['pagination_enabled']) ? 1 : 0;
+        $pagesJson = $paginationEnabled ? ($_POST['pages_json'] ?? null) : null;
         
         if (empty($name) || empty($type) || empty($fieldsJson)) {
             $_SESSION['error'] = 'Todos los campos obligatorios deben estar completos';
@@ -240,10 +211,20 @@ class FormController extends BaseController {
             $this->redirect('/formularios/editar/' . $id);
         }
         
+        // Validar pages JSON si está habilitada la paginación
+        if ($paginationEnabled && !empty($pagesJson)) {
+            $pages = json_decode($pagesJson, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $_SESSION['error'] = 'El JSON de páginas no es válido';
+                $this->redirect('/formularios/editar/' . $id);
+            }
+        }
+        
         try {
             $stmt = $this->db->prepare("
                 UPDATE forms 
-                SET name = ?, description = ?, type = ?, subtype = ?, fields_json = ?, version = version + 1
+                SET name = ?, description = ?, type = ?, subtype = ?, fields_json = ?, 
+                    pagination_enabled = ?, pages_json = ?, version = version + 1
                 WHERE id = ?
             ");
             $stmt->execute([
@@ -252,6 +233,8 @@ class FormController extends BaseController {
                 $type,
                 $subtype,
                 $fieldsJson,
+                $paginationEnabled,
+                $pagesJson,
                 $id
             ]);
             

@@ -433,16 +433,8 @@ class ApplicationController extends BaseController {
                 $publishedForms = $stmt->fetchAll();
             } catch (PDOException $e) {}
 
-            // Obtener token público del formulario vinculado (para generar enlace de cliente)
-            $formLinkToken = null;
-            if (!empty($application['form_link_id'])) {
-                try {
-                    $stmt = $this->db->prepare("SELECT public_token FROM forms WHERE id = ?");
-                    $stmt->execute([$application['form_link_id']]);
-                    $linkedFormRow = $stmt->fetch();
-                    $formLinkToken = $linkedFormRow['public_token'] ?? null;
-                } catch (PDOException $e) {}
-            }
+            // El ID del formulario es suficiente para acceso público
+            $formLinkId = $application['form_link_id'] ?? null;
             
             $this->view('applications/show', [
                 'application' => $application,
@@ -453,7 +445,7 @@ class ApplicationController extends BaseController {
                 'payments' => $payments,
                 'infoSheet' => $infoSheet,
                 'publishedForms' => $publishedForms,
-                'formLinkToken' => $formLinkToken,
+                'formLinkId' => $formLinkId,
             ]);
             
         } catch (PDOException $e) {

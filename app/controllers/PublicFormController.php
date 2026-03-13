@@ -4,7 +4,8 @@ require_once ROOT_PATH . '/app/controllers/BaseController.php';
 class PublicFormController extends BaseController {
     
     /**
-     * Show public form by token (no authentication required)
+     * Show public form by ID (no authentication required)
+     * Todos los formularios son públicos - sin restricciones
      *
      * When ?app= parameter is present the form may only be rendered if:
      *   1. The application exists and has NOT been deleted.
@@ -12,16 +13,22 @@ class PublicFormController extends BaseController {
      *   3. The form has NOT already been completed for that application.
      * Any other access attempt returns a 404 / access-denied view.
      */
-    public function show($token) {
+    public function show($formId) {
+        // Permitir embeber en iframes desde cualquier dominio
+        header('X-Frame-Options: ALLOWALL');
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST');
+        header('Access-Control-Allow-Headers: Content-Type');
+        
         try {
-            // Get form by public token
+            // Get form by ID - acceso completamente público (sin restricción de publicación)
             $stmt = $this->db->prepare("
                 SELECT f.*, u.full_name as creator_name, u.email as creator_email
                 FROM forms f
                 LEFT JOIN users u ON f.created_by = u.id
-                WHERE f.public_token = ? AND f.is_published = 1 AND f.public_enabled = 1
+                WHERE f.id = ?
             ");
-            $stmt->execute([$token]);
+            $stmt->execute([$formId]);
             $form = $stmt->fetch();
 
             if (!$form) {
@@ -31,10 +38,12 @@ class PublicFormController extends BaseController {
             }
 
             // Check if linked to a solicitud (app parameter)
+            // Nota: Los formularios son completamente públicos y reutilizables
+            // Solo se vincula a una solicitud si el parámetro ?app= está presente
             $appId = isset($_GET['app']) ? intval($_GET['app']) : null;
 
             if ($appId) {
-                // When ?app= is provided, the form is only valid for that specific solicitud
+                // When ?app= is provided, verify the application exists
                 $stmtApp = $this->db->prepare("
                     SELECT id, form_link_id, form_link_status
                     FROM applications WHERE id = ? AND form_link_id = ?
@@ -49,18 +58,8 @@ class PublicFormController extends BaseController {
                     return;
                 }
 
-                // Form has already been completed — cannot be filled again
-                if ($application['form_link_status'] === 'completado') {
-                    $this->viewPublic('public/form', [
-                        'form' => $form,
-                        'fields' => null,
-                        'pages' => null,
-                        'token' => $token,
-                        'alreadyCompleted' => true,
-                        'appId' => $appId,
-                    ]);
-                    return;
-                }
+                // NOTA: Ya no bloqueamos formularios "completados"
+                // Los formularios públicos pueden llenarse múltiples veces
             }
 
             // Parse fields JSON
@@ -76,7 +75,7 @@ class PublicFormController extends BaseController {
                 'form' => $form,
                 'fields' => $fields,
                 'pages' => $pages,
-                'token' => $token,
+                'formId' => $formId,
                 'alreadyCompleted' => false,
                 'appId' => $appId,
             ]);
@@ -91,7 +90,13 @@ class PublicFormController extends BaseController {
     /**
      * Submit public form data
      */
-    public function submit($token) {
+    public function submit($formId) {
+        // Permitir envíos desde iframes en cualquier dominio
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST');
+        header('Access-Control-Allow-Headers: Content-Type');
+        header('Content-Type: application/json');
+        
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
             echo json_encode(['error' => 'Método no permitido']);
@@ -99,12 +104,12 @@ class PublicFormController extends BaseController {
         }
         
         try {
-            // Get form
+            // Get form by ID - acceso completamente público (sin restricción de publicación)
             $stmt = $this->db->prepare("
                 SELECT * FROM forms 
-                WHERE public_token = ? AND is_published = 1 AND public_enabled = 1
+                WHERE id = ?
             ");
-            $stmt->execute([$token]);
+            $stmt->execute([$formId]);
             $form = $stmt->fetch();
             
             if (!$form) {
@@ -113,7 +118,8 @@ class PublicFormController extends BaseController {
                 return;
             }
 
-            // If linked to a solicitud, verify it still exists and has NOT been completed
+            // If linked to a solicitud, verify it still exists
+            // NOTA: Ya no bloqueamos formularios "completados" - acceso público ilimitado
             $linkedAppId = isset($_POST['appId']) ? intval($_POST['appId']) : null;
             if ($linkedAppId) {
                 $stmtCheck = $this->db->prepare("
@@ -128,11 +134,8 @@ class PublicFormController extends BaseController {
                     return;
                 }
 
-                if ($linkedAppCheck['form_link_status'] === 'completado') {
-                    http_response_code(409);
-                    echo json_encode(['error' => 'Este formulario ya fue completado previamente']);
-                    return;
-                }
+                // Los formularios públicos pueden llenarse múltiples veces
+                // No hay restricción de "completado"
             }
 
             // Get submission data

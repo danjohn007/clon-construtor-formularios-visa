@@ -35,7 +35,58 @@ ob_start();
                         <?php if ($form['description']): ?>
                         <p class="text-sm text-gray-500"><?= htmlspecialchars($form['description']) ?></p>
                         <?php endif; ?>
-                        <div class="flex items-center space-x-2 mt-1">
+                        
+                        <!-- Enlace Público -->
+                        <?php 
+                        $publicUrl = BASE_URL . '/public/form/' . $form['id'];
+                        $embedUrl = $publicUrl . '?embed=1';
+                        $embedCode = '<iframe src="' . htmlspecialchars($embedUrl) . '" width="100%" height="700px" frameborder="0" style="border: 1px solid #e5e7eb; border-radius: 8px;"></iframe>';
+                        ?>
+                        <div class="mt-2 space-y-2">
+                            <!-- Link directo -->
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs text-gray-500 w-20">Enlace:</span>
+                                <input type="text" 
+                                       id="publicLink<?= $form['id'] ?>" 
+                                       value="<?= htmlspecialchars($publicUrl) ?>" 
+                                       readonly 
+                                       class="text-xs bg-gray-50 border border-gray-300 rounded px-2 py-1 text-gray-700 flex-1 max-w-md">
+                                <button onclick="copyPublicLink(event, <?= $form['id'] ?>)" 
+                                        class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition"
+                                        title="Copiar enlace">
+                                    <i class="fas fa-copy"></i> Copiar
+                                </button>
+                                <a href="<?= $publicUrl ?>" 
+                                   target="_blank" 
+                                   class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded transition"
+                                   title="Abrir formulario">
+                                    <i class="fas fa-external-link-alt"></i> Ver
+                                </a>
+                            </div>
+                            
+                            <!-- Código iframe -->
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs text-gray-500 w-20">Embeber:</span>
+                                <input type="text" 
+                                       id="embedCode<?= $form['id'] ?>" 
+                                       value="<?= htmlspecialchars($embedCode) ?>" 
+                                       readonly 
+                                       class="text-xs bg-gray-50 border border-gray-300 rounded px-2 py-1 text-gray-700 flex-1 max-w-md font-mono">
+                                <button onclick="copyEmbedCode(event, <?= $form['id'] ?>)" 
+                                        class="text-xs bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded transition"
+                                        title="Copiar código iframe">
+                                    <i class="fas fa-code"></i> Copiar
+                                </button>
+                                <a href="<?= $embedUrl ?>" 
+                                   target="_blank" 
+                                   class="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded transition"
+                                   title="Vista previa embebida">
+                                    <i class="fas fa-window-maximize"></i> Preview
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2 mt-2">
                             <?php if ($form['cost'] > 0): ?>
                             <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                                 <i class="fas fa-dollar-sign"></i> $<?= number_format($form['cost'], 2) ?>
@@ -46,6 +97,9 @@ ob_start();
                                 <i class="fas fa-layer-group"></i> Paginado
                             </span>
                             <?php endif; ?>
+                            <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                <i class="fas fa-share-alt"></i> Embebible
+                            </span>
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -130,6 +184,59 @@ ob_start();
 </div>
 
 <script>
+function copyPublicLink(event, formId) {
+    const input = document.getElementById('publicLink' + formId);
+    
+    // Seleccionar el texto
+    input.select();
+    input.setSelectionRange(0, 99999); // Para dispositivos móviles
+    
+    // Copiar al portapapeles
+    navigator.clipboard.writeText(input.value).then(function() {
+        // Mostrar mensaje de éxito
+        const button = event.target.closest('button');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i> ¡Copiado!';
+        button.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+        button.classList.add('bg-green-500');
+        
+        // Restaurar después de 2 segundos
+        setTimeout(function() {
+            button.innerHTML = originalHTML;
+            button.classList.remove('bg-green-500');
+            button.classList.add('bg-blue-500', 'hover:bg-blue-600');
+        }, 2000);
+    }).catch(function(err) {
+        console.error('Error al copiar:', err);
+        alert('No se pudo copiar el enlace. Por favor, cópialo manualmente.');
+    });
+}
+
+function copyEmbedCode(event, formId) {
+    const input = document.getElementById('embedCode' + formId);
+    
+    // Seleccionar el texto
+    input.select();
+    input.setSelectionRange(0, 99999);
+    
+    // Copiar al portapapeles
+    navigator.clipboard.writeText(input.value).then(function() {
+        const button = event.target.closest('button');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i> ¡Copiado!';
+        button.classList.remove('bg-purple-500', 'hover:bg-purple-600');
+        button.classList.add('bg-green-500');
+        
+        setTimeout(function() {
+            button.innerHTML = originalHTML;
+            button.classList.remove('bg-green-500');
+            button.classList.add('bg-purple-500', 'hover:bg-purple-600');
+        }, 2000);
+    }).catch(function(err) {
+        console.error('Error al copiar:', err);
+        alert('No se pudo copiar el código. Por favor, cópialo manualmente.');
+    });
+}
 </script>
 
 <?php 

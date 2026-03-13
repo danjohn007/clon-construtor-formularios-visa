@@ -14,9 +14,9 @@ define('ROOT_PATH', dirname(__DIR__));
 
 // Configuración de Base de Datos
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'recursos_visas');
-define('DB_USER', 'recursos_visas');
-define('DB_PASS', '}hwFM2gahfZ%');
+define('DB_NAME', 'landscap_testing');
+define('DB_USER', 'landscap_forms_constructor');
+define('DB_PASS', 'Fiev^QKFzSIc');
 define('DB_CHARSET', 'utf8mb4');
 
 // Configuración de Timezone
@@ -34,7 +34,7 @@ ini_set('log_errors', 1);
 ini_set('error_log', ROOT_PATH . '/error.log');
 
 // Configuraciones Globales del Sistema (se cargarán de BD)
-define('SITE_NAME', 'CRM Visas y Pasaportes');
+define('SITE_NAME', 'Landscape in Austin');
 define('ITEMS_PER_PAGE', 20);
 define('MAX_FILE_SIZE', 2097152); // 2MB
 define('ALLOWED_EXTENSIONS', ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx']);

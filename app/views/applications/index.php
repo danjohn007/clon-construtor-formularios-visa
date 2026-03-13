@@ -10,9 +10,11 @@ $isAsesorRole = $_SESSION['user_role'] === ROLE_ASESOR;
         <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Solicitudes</h2>
         <p class="text-sm md:text-base text-gray-600">Gestión de trámites de visas y pasaportes</p>
     </div>
+    <!-- OCULTO TEMPORALMENTE - Botón Nueva Solicitud (referencia a visas)
     <a href="<?= BASE_URL ?>/solicitudes/crear" class="btn-primary text-white px-4 md:px-6 py-2 md:py-3 rounded-lg hover:opacity-90 transition text-sm md:text-base">
         <i class="fas fa-plus mr-2"></i>Nueva Solicitud
     </a>
+    -->
 </div>
 
 <!-- Filtros -->

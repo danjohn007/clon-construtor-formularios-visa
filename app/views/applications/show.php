@@ -318,8 +318,8 @@ $canadianStatusLabels = [
             <h3 class="text-xl font-bold text-gray-800 mb-4"><i class="fas fa-paper-plane text-blue-600 mr-2"></i>Formulario para el cliente</h3>
             <?php if ($formLinkStatus === 'completado'): ?>
                 <p class="text-green-600 font-semibold"><i class="fas fa-check-circle mr-1"></i>Cuestionario completado por el cliente</p>
-            <?php elseif ($formLinkStatus === 'enviado' && !empty($formLinkToken)): ?>
-                <?php $clientFormUrl = BASE_URL . '/public/form/' . htmlspecialchars($formLinkToken) . '?app=' . $application['id']; ?>
+            <?php elseif ($formLinkStatus === 'enviado' && !empty($formLinkId)): ?>
+                <?php $clientFormUrl = BASE_URL . '/public/form/' . intval($formLinkId) . '?app=' . $application['id']; ?>
                 <p class="text-yellow-600 font-semibold mb-3"><i class="fas fa-hourglass-half mr-1"></i>Formulario enviado — esperando respuesta</p>
                 <div class="flex items-center gap-3 flex-wrap">
                     <input type="text" readonly value="<?= htmlspecialchars($clientFormUrl) ?>"
@@ -330,8 +330,8 @@ $canadianStatusLabels = [
                 </div>
                 <p class="text-xs text-gray-500 mt-2">Solo puede llenarse una vez.</p>
             <?php else: ?>
-                <?php if (!empty($formLinkToken)): ?>
-                <?php $clientFormUrl = BASE_URL . '/public/form/' . htmlspecialchars($formLinkToken) . '?app=' . $application['id']; ?>
+                <?php if (!empty($formLinkId)): ?>
+                <?php $clientFormUrl = BASE_URL . '/public/form/' . intval($formLinkId) . '?app=' . $application['id']; ?>
                 <div class="flex items-center gap-3 flex-wrap">
                     <input type="text" readonly value="<?= htmlspecialchars($clientFormUrl) ?>"
                            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50" id="clientFormUrlInput">

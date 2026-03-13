@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $title ?? 'CRM Visas y Pasaportes' ?></title>
+    <title><?= 'Landscape in Austin' ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -275,15 +275,19 @@
                 <?php endif; ?>
                 
                 <?php if (in_array($_SESSION['user_role'] ?? '', [ROLE_ADMIN, ROLE_GERENTE])): ?>
+                <!-- OCULTO TEMPORALMENTE - Módulo Financiero
                 <a href="<?= BASE_URL ?>/financiero" class="sidebar-link flex items-center px-6 py-3 text-gray-700">
                     <i class="fas fa-dollar-sign w-6"></i>
                     <span>Módulo Financiero</span>
                 </a>
+                -->
                 
+                <!-- OCULTO TEMPORALMENTE - Reportes
                 <a href="<?= BASE_URL ?>/reportes" class="sidebar-link flex items-center px-6 py-3 text-gray-700">
                     <i class="fas fa-chart-bar w-6"></i>
                     <span>Reportes</span>
                 </a>
+                -->
                 <?php endif; ?>
                 
                 <?php if (in_array($_SESSION['user_role'] ?? '', [ROLE_ADMIN])): ?>

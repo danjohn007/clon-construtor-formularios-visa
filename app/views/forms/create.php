@@ -21,7 +21,7 @@ ob_start();
                 </label>
                 <input type="text" name="name" required
                        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                       placeholder="Ej: Visa Americana - Primera Vez">
+                       placeholder="Ej: Formulario de Cotización">
             </div>
             
             <div class="md:col-span-2">
@@ -31,39 +31,10 @@ ob_start();
                           placeholder="Descripción opcional del formulario"></textarea>
             </div>
             
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Tipo <span class="text-red-500">*</span>
-                </label>
-                <select name="type" required class="w-full border border-gray-300 rounded-lg px-4 py-2">
-                    <option value="">Seleccione...</option>
-                    <option value="Visa">Visa</option>
-                    <option value="Pasaporte">Pasaporte</option>
-                </select>
-            </div>
-            
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Subtipo</label>
-                <input type="text" name="subtype"
-                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                       placeholder="Ej: Primera vez, Renovación, etc.">
-            </div>
-            
-            <!-- Cost Section -->
-            <div class="md:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Costo del Servicio <span class="text-gray-400">(Opcional)</span>
-                </label>
-                <div class="relative">
-                    <span class="absolute left-3 top-2 text-gray-500">$</span>
-                    <input type="number" name="cost" step="0.01" min="0" value="0.00"
-                           class="w-full border border-gray-300 rounded-lg pl-8 pr-4 py-2 focus:ring-2 focus:ring-blue-500"
-                           placeholder="0.00">
-                </div>
-                <p class="text-xs text-gray-500 mt-1">
-                    <i class="fas fa-info-circle"></i> Deja en 0 si no aplica
-                </p>
-            </div>
+            <!-- Hidden fields para mantener compatibilidad con BD -->
+            <input type="hidden" name="type" value="">
+            <input type="hidden" name="subtype" value="">
+            <input type="hidden" name="cost" value="0">
             
             <!-- Pagination Section -->
             <div class="md:col-span-2 border-t pt-6">
@@ -100,7 +71,9 @@ ob_start();
                 </label>
                 
                 <!-- Visual Form Builder -->
-                <div id="form-builder-container" data-initial-data=""></div>
+                <div id="form-builder-container" 
+                     data-initial-data="" 
+                     data-initial-pages=""></div>
                 
                 <!-- Hidden field to store JSON -->
                 <input type="hidden" name="fields_json" id="fields_json_hidden" required>
@@ -122,7 +95,7 @@ ob_start();
     </form>
 </div>
 
-<script src="<?= BASE_URL ?>/js/form-builder.js"></script>
+<script src="<?= BASE_URL ?>/js/form-builder.js?v=<?= time() ?>"></script>
 <script>
 // Toggle pagination configuration visibility
 document.getElementById('pagination_enabled').addEventListener('change', function() {

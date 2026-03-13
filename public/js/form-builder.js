@@ -3,7 +3,7 @@
  * Replaces JSON textarea with a user-friendly interface
  */
 class FormBuilder {
-    constructor(containerId, initialData = null) {
+    constructor(containerId, initialData = null, initialPages = null) {
         this.container = document.getElementById(containerId);
         this.fields = [];
         this.pages = [{ id: 1, name: 'Página 1', fieldIds: [] }];
@@ -15,6 +15,7 @@ class FormBuilder {
         
         // Field types available
         this.fieldTypes = [
+            { id: 'label', label: 'Encabezado', icon: 'fa-heading' },
             { id: 'text', label: 'Texto', icon: 'fa-font' },
             { id: 'email', label: 'Email', icon: 'fa-envelope' },
             { id: 'tel', label: 'Teléfono', icon: 'fa-phone' },
@@ -39,8 +40,26 @@ class FormBuilder {
             }
         }
         
+        // Parse initial pages if provided
+        if (initialPages) {
+            try {
+                const parsedPages = typeof initialPages === 'string' ? JSON.parse(initialPages) : initialPages;
+                if (parsedPages && Array.isArray(parsedPages) && parsedPages.length > 0) {
+                    this.pages = parsedPages;
+                    this.nextPageId = Math.max(...parsedPages.map(p => p.id)) + 1;
+                }
+            } catch (e) {
+                console.error('Error parsing initial pages:', e);
+            }
+        }
+        
         // Check if pagination is enabled
         this.checkPaginationEnabled();
+        
+        // Si la paginación está habilitada pero hay campos sin asignar, asignarlos a la primera página
+        if (this.paginationEnabled && this.fields.length > 0) {
+            this.ensureAllFieldsAssigned();
+        }
         
         this.render();
     }
@@ -50,7 +69,29 @@ class FormBuilder {
         if (paginationCheckbox) {
             this.paginationEnabled = paginationCheckbox.checked;
             paginationCheckbox.addEventListener('change', (e) => {
+                const wasEnabled = this.paginationEnabled;
                 this.paginationEnabled = e.target.checked;
+                
+                // Si se activa la paginación, agregar todos los campos existentes a la primera página
+                if (this.paginationEnabled && !wasEnabled && this.fields.length > 0) {
+                    // Resetear páginas con los campos existentes en la primera página
+                    this.pages = [{
+                        id: 1,
+                        name: 'Página 1',
+                        fieldIds: this.fields.map(field => field.id)
+                    }];
+                    this.currentPage = 1;
+                    this.nextPageId = 2;
+                    console.log('Paginación activada: todos los campos asignados a Página 1');
+                }
+                
+                // Si se desactiva la paginación, limpiar las páginas
+                if (!this.paginationEnabled && wasEnabled) {
+                    this.pages = [{ id: 1, name: 'Página 1', fieldIds: [] }];
+                    this.currentPage = 1;
+                    this.nextPageId = 2;
+                }
+                
                 this.render();
                 this.updateJSON();
             });
@@ -339,6 +380,7 @@ class FormBuilder {
                                    data-index="${index}">
                         </div>
                     ` : ''}
+                    ${field.type !== 'label' ? `
                     <div class="col-span-2">
                         <label class="flex items-center">
                             <input type="checkbox" ${field.required ? 'checked' : ''} 
@@ -347,6 +389,7 @@ class FormBuilder {
                             <span class="text-xs text-gray-700">Campo obligatorio</span>
                         </label>
                     </div>
+                    ` : ''}
                 </div>
             </div>
         `}).join('');
@@ -511,6 +554,38 @@ class FormBuilder {
     getData() {
         return { fields: this.fields };
     }
+    
+    /**
+     * Asegura que todos los campos estén asignados a al menos una página
+     * Los campos huérfanos se asignan a la primera página
+     */
+    ensureAllFieldsAssigned() {
+        if (!this.paginationEnabled) return;
+        
+        // Obtener todos los IDs de campos asignados a páginas
+        const assignedFieldIds = new Set();
+        this.pages.forEach(page => {
+            if (page.fieldIds && Array.isArray(page.fieldIds)) {
+                page.fieldIds.forEach(id => assignedFieldIds.add(id));
+            }
+        });
+        
+        // Encontrar campos huérfanos (no asignados a ninguna página)
+        const orphanFields = this.fields.filter(field => !assignedFieldIds.has(field.id));
+        
+        if (orphanFields.length > 0) {
+            // Asignar campos huérfanos a la primera página
+            if (this.pages.length > 0) {
+                if (!this.pages[0].fieldIds) {
+                    this.pages[0].fieldIds = [];
+                }
+                orphanFields.forEach(field => {
+                    this.pages[0].fieldIds.push(field.id);
+                });
+                console.log(`${orphanFields.length} campo(s) huérfano(s) asignado(s) a la primera página`);
+            }
+        }
+    }
 }
 
 // Global instance
@@ -521,6 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const builderContainer = document.getElementById('form-builder-container');
     if (builderContainer) {
         const initialData = builderContainer.dataset.initialData;
-        formBuilder = new FormBuilder('form-builder-container', initialData);
+        const initialPages = builderContainer.dataset.initialPages; // Nuevo: soporte para páginas iniciales
+        formBuilder = new FormBuilder('form-builder-container', initialData, initialPages);
     }
 });
