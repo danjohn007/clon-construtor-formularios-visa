@@ -331,14 +331,27 @@ class FormBuilder {
         
         fieldsList.innerHTML = fieldsToShow.map((field) => {
             const index = this.fields.indexOf(field);
+            const hasShowWhen = field.showWhen && field.showWhen.fieldId;
+            
             return `
             <div class="field-item bg-gray-50 border border-gray-300 rounded-lg p-4 mb-3" data-index="${index}">
                 <div class="flex items-start justify-between mb-3">
                     <div class="flex items-center flex-1">
                         <i class="fas fa-grip-vertical text-gray-400 mr-3 cursor-move"></i>
-                        <div>
-                            <div class="font-semibold text-gray-800">${field.label}</div>
-                            <div class="text-xs text-gray-500">ID: ${field.id} | Tipo: ${field.type}</div>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-semibold text-gray-800">${field.label}</span>
+                                ${hasShowWhen ? `
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800" 
+                                          title="Se muestra cuando ${this.getFieldLabel(field.showWhen.fieldId)} = ${field.showWhen.value}">
+                                        <i class="fas fa-link mr-1"></i>Condicional
+                                    </span>
+                                ` : ''}
+                            </div>
+                            <div class="text-xs text-gray-500">
+                                ID: ${field.id} | Tipo: ${field.type}
+                                ${hasShowWhen ? `<br><i class="fas fa-arrow-right text-blue-500 mr-1"></i>Depende de: ${this.getFieldLabel(field.showWhen.fieldId)} = "${field.showWhen.value}"` : ''}
+                            </div>
                         </div>
                     </div>
                     <div class="flex items-center space-x-2">
@@ -353,6 +366,11 @@ class FormBuilder {
                                 `).join('')}
                             </select>
                         ` : ''}
+                        <button type="button" class="btn-configure-conditional text-blue-600 hover:text-blue-800" 
+                                data-index="${index}"
+                                title="Configurar cuándo se muestra este campo">
+                            <i class="fas fa-link"></i>
+                        </button>
                         <button type="button" class="btn-delete-field text-red-600 hover:text-red-800" data-index="${index}">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -492,6 +510,14 @@ class FormBuilder {
                 this.deleteField(index);
             });
         });
+        
+        // Configure conditional buttons
+        document.querySelectorAll('.btn-configure-conditional').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const index = parseInt(e.currentTarget.dataset.index);
+                this.openConditionalModal(index);
+            });
+        });
     }
     
     updateFieldProperty(index, property, value) {
@@ -553,6 +579,250 @@ class FormBuilder {
     
     getData() {
         return { fields: this.fields };
+    }
+    
+    /**
+     * Obtiene el label de un campo por su ID
+     */
+    getFieldLabel(fieldId) {
+        const field = this.fields.find(f => f.id === fieldId);
+        return field ? field.label : fieldId;
+    }
+    
+    /**
+     * Abre el modal simple de configuración condicional
+     */
+    openConditionalModal(fieldIndex) {
+        const field = this.fields[fieldIndex];
+        if (!field) return;
+        
+        const hasShowWhen = field.showWhen && field.showWhen.fieldId;
+        const selectFields = this.fields.filter(f => f.type === 'select' && f.id !== field.id);
+        
+        // Crear modal simple
+        const modalHtml = `
+            <div id="conditional-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-lg shadow-xl max-w-lg w-full">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 rounded-t-lg">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-white">
+                                <i class="fas fa-link mr-2"></i>Campo Condicional
+                            </h3>
+                            <button type="button" id="close-modal" class="text-white hover:text-gray-200">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        <p class="text-blue-100 text-sm mt-1">Configurando: <strong>${field.label}</strong></p>
+                    </div>
+                    
+                    <div class="p-6">
+                        ${selectFields.length === 0 ? `
+                            <div class="text-center py-8">
+                                <i class="fas fa-info-circle text-gray-400 text-4xl mb-3"></i>
+                                <p class="text-gray-600 font-medium mb-2">No hay campos de selección disponibles</p>
+                                <p class="text-sm text-gray-500">Primero debes crear al menos un campo tipo "Selección" para poder configurar dependencias</p>
+                            </div>
+                        ` : `
+                            <!-- Enable checkbox -->
+                            <div class="mb-5 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <label class="flex items-start cursor-pointer">
+                                    <input type="checkbox" id="conditional-enabled" 
+                                           ${hasShowWhen ? 'checked' : ''}
+                                           class="w-5 h-5 text-blue-600 rounded mt-0.5 flex-shrink-0">
+                                    <div class="ml-3">
+                                        <span class="text-sm font-medium text-gray-900">
+                                            Mostrar este campo solo cuando otro campo tenga un valor específico
+                                        </span>
+                                        <p class="text-xs text-gray-600 mt-1">
+                                            Por ejemplo: mostrar "Tamaño del jardín" solo si "Tipo de servicio" es "Residencial"
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <!-- Conditional config -->
+                            <div id="conditional-config" ${!hasShowWhen ? 'style="display:none"' : ''}>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            <i class="fas fa-level-up-alt mr-1 text-blue-500"></i>
+                                            ¿De qué campo depende?
+                                        </label>
+                                        <select id="parent-field-select" 
+                                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                            <option value="">Seleccionar campo...</option>
+                                            ${selectFields.map(f => `
+                                                <option value="${f.id}" ${field.showWhen?.fieldId === f.id ? 'selected' : ''}>
+                                                    ${f.label}
+                                                </option>
+                                            `).join('')}
+                                        </select>
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            Solo aparecen campos de tipo "Selección"
+                                        </p>
+                                    </div>
+                                    
+                                    <div id="value-selector" ${!field.showWhen?.fieldId ? 'style="display:none"' : ''}>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            <i class="fas fa-check-circle mr-1 text-blue-500"></i>
+                                            ¿Qué valor debe tener ese campo?
+                                        </label>
+                                        <select id="parent-value-select" 
+                                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                            <option value="">Seleccionar valor...</option>
+                                        </select>
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            Este campo aparecerá solo cuando se seleccione esta opción
+                                        </p>
+                                    </div>
+                                    
+                                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                        <div class="flex">
+                                            <i class="fas fa-lightbulb text-yellow-600 mt-0.5 mr-2 flex-shrink-0"></i>
+                                            <div class="text-xs text-yellow-800">
+                                                <strong>Ejemplo:</strong> Si configuras que este campo depende de 
+                                                "Tipo de servicio" con valor "Residencial", entonces este campo 
+                                                solo aparecerá en el formulario cuando el usuario seleccione "Residencial" 
+                                                en la opción de tipo de servicio.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `}
+                    </div>
+                    
+                    <div class="bg-gray-50 px-6 py-4 border-t flex justify-end gap-3 rounded-b-lg">
+                        <button type="button" id="cancel-conditional" 
+                                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                            Cancelar
+                        </button>
+                        ${selectFields.length > 0 ? `
+                            <button type="button" id="save-conditional" 
+                                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-save mr-1"></i>Guardar
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Insert modal into document
+        const modalElement = document.createElement('div');
+        modalElement.innerHTML = modalHtml;
+        document.body.appendChild(modalElement);
+        
+        // Si hay un campo padre seleccionado, cargar sus opciones
+        if (field.showWhen?.fieldId) {
+            this.loadParentOptions(field.showWhen.fieldId, field.showWhen.value);
+        }
+        
+        // Event listeners
+        const conditionalEnabled = document.getElementById('conditional-enabled');
+        if (conditionalEnabled) {
+            conditionalEnabled.addEventListener('change', (e) => {
+                const config = document.getElementById('conditional-config');
+                if (config) {
+                    config.style.display = e.target.checked ? '' : 'none';
+                }
+            });
+        }
+        
+        const parentSelect = document.getElementById('parent-field-select');
+        if (parentSelect) {
+            parentSelect.addEventListener('change', (e) => {
+                const valueSelector = document.getElementById('value-selector');
+                if (valueSelector) {
+                    valueSelector.style.display = e.target.value ? '' : 'none';
+                }
+                if (e.target.value) {
+                    this.loadParentOptions(e.target.value);
+                }
+            });
+        }
+        
+        document.getElementById('close-modal')?.addEventListener('click', () => {
+            this.closeConditionalModal();
+        });
+        
+        document.getElementById('cancel-conditional')?.addEventListener('click', () => {
+            this.closeConditionalModal();
+        });
+        
+        const saveBtn = document.getElementById('save-conditional');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                this.saveConditional(fieldIndex);
+            });
+        }
+        
+        // Close on backdrop click
+        document.getElementById('conditional-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'conditional-modal') {
+                this.closeConditionalModal();
+            }
+        });
+    }
+    
+    /**
+     * Carga las opciones del campo padre en el dropdown de valores
+     */
+    loadParentOptions(parentFieldId, selectedValue = '') {
+        const parentField = this.fields.find(f => f.id === parentFieldId);
+        if (!parentField || !parentField.options) return;
+        
+        const valueSelect = document.getElementById('parent-value-select');
+        if (!valueSelect) return;
+        
+        valueSelect.innerHTML = '<option value="">Seleccionar valor...</option>' +
+            parentField.options.map(opt => `
+                <option value="${opt}" ${opt === selectedValue ? 'selected' : ''}>
+                    ${opt}
+                </option>
+            `).join('');
+    }
+    
+    /**
+     * Guarda la configuración condicional simple
+     */
+    saveConditional(fieldIndex) {
+        const field = this.fields[fieldIndex];
+        if (!field) return;
+        
+        const enabled = document.getElementById('conditional-enabled')?.checked || false;
+        
+        if (enabled) {
+            const parentFieldId = document.getElementById('parent-field-select')?.value;
+            const parentValue = document.getElementById('parent-value-select')?.value;
+            
+            if (!parentFieldId || !parentValue) {
+                alert('Debes seleccionar tanto el campo padre como el valor específico');
+                return;
+            }
+            
+            field.showWhen = {
+                fieldId: parentFieldId,
+                value: parentValue
+            };
+        } else {
+            // Eliminar configuración condicional
+            delete field.showWhen;
+        }
+        
+        this.closeConditionalModal();
+        this.renderFields();
+        this.updateJSON();
+    }
+    
+    /**
+     * Cierra el modal condicional
+     */
+    closeConditionalModal() {
+        const modal = document.getElementById('conditional-modal');
+        if (modal && modal.parentElement) {
+            modal.parentElement.remove();
+        }
     }
     
     /**
