@@ -20,7 +20,7 @@ class FormController extends BaseController {
                 SELECT f.*, u.full_name as creator_name
                 FROM forms f
                 LEFT JOIN users u ON f.created_by = u.id
-                ORDER BY f.created_at DESC
+                ORDER BY f.is_published DESC, f.created_at DESC
                 LIMIT $limit OFFSET $offset
             ");
             $stmt->execute();
@@ -56,7 +56,7 @@ class FormController extends BaseController {
         
         $name = trim($_POST['name'] ?? '');
         $description = trim($_POST['description'] ?? '');
-        $type = $_POST['type'] ?? '';
+        $type = !empty($_POST['type']) ? $_POST['type'] : 'formulario'; // Valor por defecto
         $subtype = trim($_POST['subtype'] ?? '');
         $fieldsJson = $_POST['fields_json'] ?? '';
         $cost = floatval($_POST['cost'] ?? 0);
@@ -64,7 +64,8 @@ class FormController extends BaseController {
         $paginationEnabled = isset($_POST['pagination_enabled']) ? 1 : 0;
         $pagesJson = $paginationEnabled ? ($_POST['pages_json'] ?? null) : null;
         
-        if (empty($name) || empty($type) || empty($fieldsJson)) {
+        // Validar solo campos realmente obligatorios
+        if (empty($name) || empty($fieldsJson)) {
             $_SESSION['error'] = 'Todos los campos obligatorios deben estar completos';
             $this->redirect('/formularios/crear');
         }
@@ -308,6 +309,102 @@ class FormController extends BaseController {
         } catch (PDOException $e) {
             error_log("Error al cambiar estado: " . $e->getMessage());
             $_SESSION['error'] = 'Error al cambiar estado de publicación';
+            $this->redirect('/formularios');
+        }
+    }
+    
+    /**
+     * Publicar formulario en el sitio principal (codigo_principal/contact.php)
+     * Solo un formulario puede estar publicado a la vez
+     */
+    public function publishToProduction($id) {
+        $this->requireRole([ROLE_ADMIN]);
+        
+        try {
+            // Verificar que el formulario existe
+            $stmt = $this->db->prepare("
+                SELECT id, name, is_published
+                FROM forms 
+                WHERE id = ?
+            ");
+            $stmt->execute([$id]);
+            $form = $stmt->fetch();
+            
+            if (!$form) {
+                $_SESSION['error'] = 'Formulario no encontrado';
+                $this->redirect('/formularios');
+            }
+            
+            // Iniciar transacción
+            $this->db->beginTransaction();
+            
+            // Si el formulario ya está publicado, solo lo despublicamos
+            if ($form['is_published']) {
+                $stmt = $this->db->prepare("
+                    UPDATE forms 
+                    SET is_published = 0, public_enabled = 0
+                    WHERE id = ?
+                ");
+                $stmt->execute([$id]);
+                
+                $this->db->commit();
+                
+                logAudit('update', 'formularios', "Formulario '{$form['name']}' despublicado de contact.php");
+                $_SESSION['success'] = "Formulario removido. Se mostrará el formulario original en contact.php";
+                
+            } else {
+                // Despublicar todos los demás formularios
+                $stmt = $this->db->prepare("UPDATE forms SET is_published = 0, public_enabled = 0");
+                $stmt->execute();
+                
+                // Publicar este formulario
+                $stmt = $this->db->prepare("
+                    UPDATE forms 
+                    SET is_published = 1, public_enabled = 1
+                    WHERE id = ?
+                ");
+                $stmt->execute([$id]);
+                
+                $this->db->commit();
+                
+                logAudit('update', 'formularios', "Formulario '{$form['name']}' publicado en contact.php");
+                $_SESSION['success'] = "Formulario '{$form['name']}' ahora se muestra en contact.php del sitio principal";
+            }
+            
+            $this->redirect('/formularios');
+            
+        } catch (PDOException $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log("Error al publicar en producción: " . $e->getMessage());
+            $_SESSION['error'] = 'Error al publicar en producción';
+            $this->redirect('/formularios');
+        }
+    }
+    
+    /**
+     * Restaurar formulario original (despublicar todos los formularios dinámicos)
+     */
+    public function restoreOriginal() {
+        $this->requireRole([ROLE_ADMIN]);
+        
+        try {
+            // Despublicar TODOS los formularios
+            $stmt = $this->db->prepare("
+                UPDATE forms 
+                SET is_published = 0, public_enabled = 0
+            ");
+            $stmt->execute();
+            
+            logAudit('update', 'formularios', 'Todos los formularios despublicados - Restaurado formulario original en contact.php');
+            $_SESSION['success'] = 'Formulario original restaurado. Ahora se muestra el formulario clásico en contact.php';
+            
+            $this->redirect('/formularios');
+            
+        } catch (PDOException $e) {
+            error_log("Error al restaurar formulario original: " . $e->getMessage());
+            $_SESSION['error'] = 'Error al restaurar formulario original';
             $this->redirect('/formularios');
         }
     }

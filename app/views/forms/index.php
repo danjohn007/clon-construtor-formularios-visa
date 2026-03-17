@@ -8,9 +8,18 @@ ob_start();
         <h2 class="text-3xl font-bold text-gray-800">Constructor de Formularios</h2>
         <p class="text-gray-600">Gestión de formularios dinámicos</p>
     </div>
-    <a href="<?= BASE_URL ?>/formularios/crear" class="btn-primary text-white px-6 py-3 rounded-lg hover:opacity-90 transition">
-        <i class="fas fa-plus mr-2"></i>Nuevo Formulario
-    </a>
+    <div class="flex gap-3">
+        <form method="POST" action="<?= BASE_URL ?>/formularios/restaurar-original" class="inline">
+            <button type="submit" 
+                    onclick="return confirm('¿Seguro que deseas mostrar el formulario original en contact.php? Esto despublicará todos los formularios dinámicos.');"
+                    class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg transition flex items-center">
+                <i class="fas fa-undo mr-2"></i>Restaurar Formulario Original
+            </button>
+        </form>
+        <a href="<?= BASE_URL ?>/formularios/crear" class="btn-primary text-white px-6 py-3 rounded-lg hover:opacity-90 transition">
+            <i class="fas fa-plus mr-2"></i>Nuevo Formulario
+        </a>
+    </div>
 </div>
 
 <div class="bg-white rounded-lg shadow overflow-hidden">
@@ -29,7 +38,7 @@ ob_start();
             </thead>
             <tbody class="divide-y divide-gray-200">
                 <?php foreach ($forms as $form): ?>
-                <tr class="hover:bg-gray-50">
+                <tr class="<?= $form['is_published'] ? 'bg-green-50 hover:bg-green-100 border-l-4 border-l-green-500' : 'hover:bg-gray-50' ?>">
                     <td class="px-6 py-4">
                         <span class="font-medium text-gray-900"><?= htmlspecialchars($form['name']) ?></span>
                         <?php if ($form['description']): ?>
@@ -77,12 +86,6 @@ ob_start();
                                         title="Copiar código iframe">
                                     <i class="fas fa-code"></i> Copiar
                                 </button>
-                                <a href="<?= $embedUrl ?>" 
-                                   target="_blank" 
-                                   class="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded transition"
-                                   title="Vista previa embebida">
-                                    <i class="fas fa-window-maximize"></i> Preview
-                                </a>
                             </div>
                         </div>
                         
@@ -137,6 +140,13 @@ ob_start();
                                     <i class="fas fa-<?= $form['is_published'] ? 'eye-slash' : 'eye' ?>"></i>
                                 </button>
                             </form>
+                            <!-- <form method="POST" action="<?= BASE_URL ?>/formularios/publicar-produccion/<?= $form['id'] ?>" class="inline">
+                                <button type="submit" 
+                                        class="text-blue-600 hover:text-blue-800" 
+                                        title="Publicar en contact.php">
+                                    <i class="fas fa-globe"></i>
+                                </button>
+                            </form> -->
                             <form method="POST" action="<?= BASE_URL ?>/formularios/eliminar/<?= $form['id'] ?>" 
                                   class="inline" onsubmit="return confirm('¿Está seguro de eliminar este formulario?')">
                                 <button type="submit" class="text-red-600 hover:text-red-800" title="Eliminar">
