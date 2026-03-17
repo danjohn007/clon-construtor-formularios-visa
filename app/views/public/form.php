@@ -664,13 +664,25 @@ $contactInfo = [
             for (const [key, value] of formData.entries()) {
                 const field = form.querySelector(`[name="${key}"]`);
                 if (field) {
+                    // Obtener el label del campo para usar como key descriptivo
+                    const fieldContainer = field.closest('.form-field');
+                    let fieldLabel = key; // default al ID si no se encuentra label
+                    
+                    if (fieldContainer) {
+                        const labelElement = fieldContainer.querySelector('label');
+                        if (labelElement) {
+                            // Limpiar el texto del label (remover asterisco de requerido y espacios)
+                            fieldLabel = labelElement.textContent.trim().replace(/\*\s*$/, '').trim();
+                        }
+                    }
+                    
                     if (field.type === 'file') {
                         if (field.files && field.files[0]) {
                             payload.append(key, field.files[0]);
-                            data[key] = field.files[0].name;
+                            data[fieldLabel] = field.files[0].name;
                         }
                     } else {
-                        data[key] = value;
+                        data[fieldLabel] = value;
                     }
                 }
             }
