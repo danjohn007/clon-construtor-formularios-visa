@@ -296,8 +296,9 @@ $contactInfo = [
                 
                 <!-- Form -->
                 <form id="public-form" class="space-y-4">
-                    <input type="hidden" id="submission-id" name="submissionId" value="">
-                    <input type="hidden" id="current-page" name="currentPage" value="1">
+                    <!-- Campos ocultos sin name para que no se envíen en la validación -->
+                    <input type="hidden" id="submission-id" value="">
+                    <input type="hidden" id="current-page" value="1">
                     
                     <?php foreach ($fields['fields'] as $field): ?>
                     <div class="form-field" data-field-id="<?= htmlspecialchars($field['id']) ?>" data-page="<?php
@@ -574,7 +575,8 @@ $contactInfo = [
             let isValid = true;
             
             currentPageFields.forEach(fieldDiv => {
-                const inputs = fieldDiv.querySelectorAll('input[required], select[required], textarea[required]');
+                // Solo validar campos visibles y requeridos (excluir campos ocultos)
+                const inputs = fieldDiv.querySelectorAll('input[required]:not([type="hidden"]), select[required], textarea[required]');
                 inputs.forEach(input => {
                     if (!input.checkValidity()) {
                         input.reportValidity();
@@ -656,10 +658,9 @@ $contactInfo = [
                 autosaveText.textContent = 'Guardando...';
             }
             
-            const payload = new FormData();
             const data = {};
             
-            // Collect form data
+            // Collect form data con labels descriptivos
             const formData = new FormData(form);
             for (const [key, value] of formData.entries()) {
                 const field = form.querySelector(`[name="${key}"]`);
@@ -676,10 +677,10 @@ $contactInfo = [
                         }
                     }
                     
+                    // Por ahora ignoramos archivos (send_quote.php no los maneja)
                     if (field.type === 'file') {
                         if (field.files && field.files[0]) {
-                            payload.append(key, field.files[0]);
-                            data[fieldLabel] = field.files[0].name;
+                            data[fieldLabel] = field.files[0].name + ' (archivo adjunto)';
                         }
                     } else {
                         data[fieldLabel] = value;
@@ -687,29 +688,21 @@ $contactInfo = [
                 }
             }
             
-            payload.append('formData', JSON.stringify(data));
-            payload.append('currentPage', currentPageInput.value);
-            payload.append('isCompleted', isCompleted);
+            // Agregar metadata
+            data['submissionId'] = submissionIdInput.value || '';
+            data['currentPage'] = currentPageInput.value;
             
-            <?php if (!empty($appId)): ?>
-            payload.append('appId', '<?= intval($appId) ?>');
-            <?php endif; ?>
-
-            if (submissionIdInput.value) {
-                payload.append('submissionId', submissionIdInput.value);
-            }
-            
-            fetch('<?= BASE_URL ?>/public/form/<?= $formId ?>/submit', {
+            // Enviar a send_quote.php en formato JSON
+            fetch('/send_quote.php', {
                 method: 'POST',
-                body: payload
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
             })
             .then(response => response.json())
             .then(result => {
-                if (result.success) {
-                    if (result.submissionId && !submissionIdInput.value) {
-                        submissionIdInput.value = result.submissionId;
-                    }
-                    
+                if (result.status === 'success') {
                     if (isCompleted) {
                         try {
                             localStorage.removeItem(LOCALSTORAGE_KEY);
@@ -727,21 +720,15 @@ $contactInfo = [
                         }, 2000);
                     }
                     
-                    if (result.progressPercentage) {
-                        updateProgress(result.progressPercentage);
-                    } else if (paginationEnabled) {
-                        calculateProgress();
-                    }
-                    
                     if (callback) callback();
                 } else {
-                    alert('Error: ' + (result.error || 'No se pudo guardar el formulario'));
+                    alert('Error: ' + (result.message || 'No se pudo enviar el formulario'));
                     if (errorCallback) errorCallback();
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error al guardar el formulario. Por favor, intenta de nuevo.');
+                alert('Error al enviar el formulario. Por favor, intenta de nuevo.');
                 if (errorCallback) errorCallback();
             })
             .finally(() => {
