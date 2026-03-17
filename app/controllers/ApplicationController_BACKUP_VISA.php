@@ -42,7 +42,7 @@ class ApplicationController extends BaseController {
             
             // Búsqueda por nombre, email o folio
             if (!empty($search)) {
-                $where[] = "(a.applicant_name LIKE ? OR a.applicant_email LIKE ? OR a.folio LIKE ?)";
+                $where[] = "(a.client_name LIKE ? OR a.applicant_email LIKE ? OR a.folio LIKE ?)";
                 $searchTerm = "%$search%";
                 $params[] = $searchTerm;
                 $params[] = $searchTerm;
@@ -189,7 +189,7 @@ class ApplicationController extends BaseController {
                         INSERT INTO applications
                             (folio, form_id, form_version, type, subtype,
                              is_canadian_visa, canadian_tipo, canadian_modalidad,
-                             form_data, applicant_name, created_by)
+                             data_json, client_name, created_by)
                         VALUES (?, ?, ?, 'Visa', ?, 1, ?, ?, ?, ?, ?)
                     ");
                     // subtype = canadian_modalidad for backward-compat with $isRenovacion check
@@ -208,7 +208,7 @@ class ApplicationController extends BaseController {
                     // Fallback if new columns don't exist yet
                     $stmt = $this->db->prepare("
                         INSERT INTO applications
-                            (folio, form_id, form_version, type, subtype, form_data, created_by)
+                            (folio, form_id, form_version, type, subtype, data_json, created_by)
                         VALUES (?, ?, ?, 'Visa', ?, ?, ?)
                     ");
                     $stmt->execute([
@@ -278,7 +278,7 @@ class ApplicationController extends BaseController {
             // Crear solicitud con datos básicos
             try {
                 $stmt = $this->db->prepare("
-                    INSERT INTO applications (folio, form_id, form_version, type, subtype, form_data, applicant_name, created_by)
+                    INSERT INTO applications (folio, form_id, form_version, type, subtype, data_json, client_name, created_by)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
@@ -292,9 +292,9 @@ class ApplicationController extends BaseController {
                     $_SESSION['user_id']
                 ]);
             } catch (PDOException $e) {
-                // Fallback if applicant_name column doesn't exist yet
+                // Fallback if client_name column doesn't exist yet
                 $stmt = $this->db->prepare("
-                    INSERT INTO applications (folio, form_id, form_version, type, subtype, form_data, created_by)
+                    INSERT INTO applications (folio, form_id, form_version, type, subtype, data_json, created_by)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
@@ -346,14 +346,15 @@ class ApplicationController extends BaseController {
         $userId = $_SESSION['user_id'];
         
         try {
-            // Obtener solicitud con joins opcionales
+            // Obtener solicitud
             $stmt = $this->db->prepare("
-                SELECT a.*, 
-                       u.full_name as creator_name,
-                       COALESCE(a.form_name, f.name) as form_display_name
+                SELECT a.*, u.full_name as creator_name,
+                       f.name as form_name, f.fields_json,
+                       fs.total_costs, fs.total_paid, fs.balance, fs.status as financial_status
                 FROM applications a
                 LEFT JOIN users u ON a.created_by = u.id
                 LEFT JOIN forms f ON a.form_id = f.id
+                LEFT JOIN financial_status fs ON a.id = fs.application_id
                 WHERE a.id = ?
             ");
             $stmt->execute([$id]);
@@ -362,84 +363,113 @@ class ApplicationController extends BaseController {
             if (!$application) {
                 $_SESSION['error'] = 'Solicitud no encontrada';
                 $this->redirect('/solicitudes');
-                return;
             }
             
-            // Control de acceso: Asesor solo puede ver sus propias solicitudes
+            // REGLA CRÍTICA: Asesor solo puede ver SUS PROPIAS solicitudes y no las cerradas
             if ($role === ROLE_ASESOR) {
-                if ($application['created_by'] && intval($application['created_by']) !== intval($userId)) {
+                if ($application['status'] === STATUS_TRAMITE_CERRADO || $application['status'] === STATUS_FINALIZADO) {
                     $_SESSION['error'] = 'No tiene permisos para ver esta solicitud';
                     $this->redirect('/solicitudes');
-                    return;
+                }
+                if (intval($application['created_by']) !== intval($userId)) {
+                    $_SESSION['error'] = 'No tiene permisos para ver esta solicitud';
+                    $this->redirect('/solicitudes');
                 }
             }
             
-            // Obtener historial de estatus (si la tabla existe)
-            $history = [];
-            try {
+            // Obtener historial de estatus
+            $stmt = $this->db->prepare("
+                SELECT sh.*, u.full_name as changed_by_name
+                FROM status_history sh
+                LEFT JOIN users u ON sh.changed_by = u.id
+                WHERE sh.application_id = ?
+                ORDER BY sh.created_at DESC
+            ");
+            $stmt->execute([$id]);
+            $history = $stmt->fetchAll();
+            
+            // Obtener documentos
+            $stmt = $this->db->prepare("
+                SELECT d.*, u.full_name as uploaded_by_name
+                FROM documents d
+                LEFT JOIN users u ON d.uploaded_by = u.id
+                WHERE d.application_id = ?
+                ORDER BY d.created_at DESC
+            ");
+            $stmt->execute([$id]);
+            $documents = $stmt->fetchAll();
+            
+            // Obtener indicaciones/notas
+            $stmt = $this->db->prepare("
+                SELECT n.*, u.full_name as created_by_name, u.role as created_by_role
+                FROM application_notes n
+                LEFT JOIN users u ON n.created_by = u.id
+                WHERE n.application_id = ?
+                ORDER BY n.is_important DESC, n.created_at DESC
+            ");
+            $stmt->execute([$id]);
+            $notes = $stmt->fetchAll();
+            
+            // Obtener costos (solo Admin y Gerente)
+            $costs = [];
+            $payments = [];
+            if ($this->canAccessFinancial()) {
                 $stmt = $this->db->prepare("
-                    SELECT sh.*, u.full_name as changed_by_name
-                    FROM status_history sh
-                    LEFT JOIN users u ON sh.changed_by = u.id
-                    WHERE sh.application_id = ?
-                    ORDER BY sh.created_at DESC
+                    SELECT fc.*, u.full_name as created_by_name
+                    FROM financial_costs fc
+                    LEFT JOIN users u ON fc.created_by = u.id
+                    WHERE fc.application_id = ?
+                    ORDER BY fc.created_at DESC
                 ");
                 $stmt->execute([$id]);
-                $history = $stmt->fetchAll();
-            } catch (PDOException $e) {
-                // Tabla puede no existir
-            }
-            
-            // Obtener documentos (si la tabla existe)
-            $documents = [];
-            try {
+                $costs = $stmt->fetchAll();
+                
                 $stmt = $this->db->prepare("
-                    SELECT d.*, u.full_name as uploaded_by_name
-                    FROM documents d
-                    LEFT JOIN users u ON d.uploaded_by = u.id
-                    WHERE d.application_id = ?
-                    ORDER BY d.created_at DESC
+                    SELECT p.*, u.full_name as registered_by_name
+                    FROM payments p
+                    LEFT JOIN users u ON p.registered_by = u.id
+                    WHERE p.application_id = ?
+                    ORDER BY p.payment_date DESC
                 ");
                 $stmt->execute([$id]);
-                $documents = $stmt->fetchAll();
-            } catch (PDOException $e) {
-                // Tabla puede no existir
+                $payments = $stmt->fetchAll();
             }
-            
-            // Obtener notas (si la tabla existe)
-            $notes = [];
-            try {
-                $stmt = $this->db->prepare("
-                    SELECT n.*, u.full_name as created_by_name, u.role as created_by_role
-                    FROM application_notes n
-                    LEFT JOIN users u ON n.created_by = u.id
-                    WHERE n.application_id = ?
-                    ORDER BY n.is_important DESC, n.created_at DESC
-                ");
-                $stmt->execute([$id]);
-                $notes = $stmt->fetchAll();
-            } catch (PDOException $e) {
-                // Tabla puede no existir
-            }
-            
-            // Variables vacías para compatibilidad con vista
+
+            // Obtener hoja de información si existe
             $infoSheet = null;
+            try {
+                $stmt = $this->db->prepare("SELECT * FROM information_sheets WHERE application_id = ?");
+                $stmt->execute([$id]);
+                $infoSheet = $stmt->fetch() ?: null;
+            } catch (PDOException $e) {
+                // Tabla puede no existir aún
+            }
+
+            // Obtener formularios publicados (para dropdown de envío a cliente)
             $publishedForms = [];
-            $formLinkId = null;
+            try {
+                $stmt = $this->db->query("SELECT id, name, type, subtype FROM forms WHERE is_published = 1 ORDER BY type, name");
+                $publishedForms = $stmt->fetchAll();
+            } catch (PDOException $e) {}
+
+            // El ID del formulario es suficiente para acceso público
+            $formLinkId = $application['form_link_id'] ?? null;
             
             $this->view('applications/show', [
                 'application' => $application,
                 'history' => $history,
                 'documents' => $documents,
                 'notes' => $notes,
+                'costs' => $costs,
+                'payments' => $payments,
                 'infoSheet' => $infoSheet,
                 'publishedForms' => $publishedForms,
                 'formLinkId' => $formLinkId,
             ]);
             
         } catch (PDOException $e) {
-            error_log("Error al ver solicitud ID $id: " . $e->getMessage());
-            $_SESSION['error'] = 'Error al cargar solicitud: ' . $e->getMessage();
+            error_log("Error al ver solicitud: " . $e->getMessage());
+            $_SESSION['error'] = 'Error al cargar solicitud';
             $this->redirect('/solicitudes');
         }
     }
@@ -1073,7 +1103,7 @@ class ApplicationController extends BaseController {
             }
             
             // Obtener datos del formulario
-            $formData = json_decode($application['form_data'], true);
+            $formData = json_decode($application['data_json'], true);
             $formFields = json_decode($application['fields_json'], true);
             
             // Verificar que el campo existe y es de tipo file
@@ -1618,14 +1648,11 @@ class ApplicationController extends BaseController {
     }
 
     public function downloadDocument($docId) {
-        $this->requireLogin();
-        
-        $role = $this->getUserRole();
-        $userId = $_SESSION['user_id'];
+        $this->requireRole([ROLE_ADMIN, ROLE_GERENTE]);
 
         try {
             $stmt = $this->db->prepare("
-                SELECT d.*, a.id as app_id, a.created_by
+                SELECT d.*, a.id as app_id
                 FROM documents d
                 LEFT JOIN applications a ON d.application_id = a.id
                 WHERE d.id = ?
@@ -1636,29 +1663,15 @@ class ApplicationController extends BaseController {
             if (!$doc) {
                 $_SESSION['error'] = 'Documento no encontrado';
                 $this->redirect('/solicitudes');
-                return;
-            }
-            
-            // Control de acceso: Asesor solo puede descargar de sus propias solicitudes
-            if ($role === ROLE_ASESOR) {
-                if ($doc['created_by'] && intval($doc['created_by']) !== intval($userId)) {
-                    $_SESSION['error'] = 'No tiene permisos para descargar este documento';
-                    $this->redirect('/solicitudes');
-                    return;
-                }
             }
 
             $filePath = ROOT_PATH . '/public' . $doc['file_path'];
             if (!file_exists($filePath)) {
                 $_SESSION['error'] = 'El archivo no existe en el servidor';
                 $this->redirect('/solicitudes/ver/' . $doc['app_id']);
-                return;
             }
 
-            // Log audit if function exists
-            if (function_exists('logAudit')) {
-                logAudit('download', 'documentos', "Descarga de documento #$docId ({$doc['name']})");
-            }
+            logAudit('download', 'documentos', "Descarga de documento #$docId ({$doc['name']})");
 
             header('Content-Description: File Transfer');
             header('Content-Type: application/octet-stream');

@@ -137,9 +137,9 @@ function logCustomerJourney($applicationId, $touchpointType, $title, $descriptio
  * Get all unique email recipients for an application appointment notification.
  *
  * Collects emails from:
- *   1. Basic application data (data_json.email)
+ *   1. Basic application data (form_data.email)
  *   2. Information sheet (information_sheets.client_email)
- *   3. Any 'email' type fields in the client form response (data_json)
+ *   3. Any 'email' type fields in the client form response (form_data)
  *   4. The asesor who created the application (users.email)
  *   5. All active Admins and Gerentes (users.email)
  *
@@ -155,7 +155,7 @@ function getApplicationEmailRecipients($applicationId, $db) {
     try {
         // 1 & 3: Application basic data + form fields
         $stmt = $db->prepare("
-            SELECT a.data_json, a.form_id, a.created_by
+            SELECT a.form_data, a.form_id, a.created_by
             FROM applications a
             WHERE a.id = ?
         ");
@@ -166,7 +166,7 @@ function getApplicationEmailRecipients($applicationId, $db) {
             return [];
         }
 
-        $basicData = json_decode($app['data_json'], true) ?: [];
+        $basicData = json_decode($app['form_data'], true) ?: [];
 
         // Email from basic registration fields
         if (!empty($basicData['email']) && filter_var(trim($basicData['email']), FILTER_VALIDATE_EMAIL)) {
@@ -309,8 +309,8 @@ function sendAppointmentNotificationEmail($applicationId, $type, $appointmentDat
     }
 
     // Build email content
-    $data       = json_decode($application['data_json'], true) ?: [];
-    $clientName = trim(($application['client_name'] ?? '') ?: (($data['nombre'] ?? '') . ' ' . ($data['apellidos'] ?? '')));
+    $data       = json_decode($application['form_data'], true) ?: [];
+    $clientName = trim(($application['applicant_name'] ?? '') ?: (($data['nombre'] ?? '') . ' ' . ($data['apellidos'] ?? '')));
     if (empty($clientName)) {
         $clientName = 'Cliente';
     }
@@ -459,7 +459,7 @@ function getUpcomingNotifications() {
                 a.id            AS application_id,
                 a.folio,
                 a.created_by,
-                JSON_UNQUOTE(JSON_EXTRACT(a.data_json, '$.nombre')) AS client_name,
+                JSON_UNQUOTE(JSON_EXTRACT(a.form_data, '$.nombre')) AS client_name,
                 'appointment'   AS notification_type,
                 a.appointment_date AS appointment_date,
                 NULL            AS location,
@@ -481,7 +481,7 @@ function getUpcomingNotifications() {
                 a.id            AS application_id,
                 a.folio,
                 a.created_by,
-                JSON_UNQUOTE(JSON_EXTRACT(a.data_json, '$.nombre')) AS client_name,
+                JSON_UNQUOTE(JSON_EXTRACT(a.form_data, '$.nombre')) AS client_name,
                 'biometric'     AS notification_type,
                 a.canadian_biometric_date AS appointment_date,
                 a.canadian_biometric_location AS location,

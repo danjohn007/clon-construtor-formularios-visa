@@ -292,6 +292,14 @@ class FormController extends BaseController {
             
             // Toggle estado
             $newStatus = $form['is_published'] ? 0 : 1;
+            
+            // Si estamos PUBLICANDO (newStatus = 1), despublicar todos los demás
+            if ($newStatus == 1) {
+                $stmt = $this->db->prepare("UPDATE forms SET is_published = 0, public_enabled = 0 WHERE id != ?");
+                $stmt->execute([$id]);
+            }
+            
+            // Actualizar el formulario actual
             $stmt = $this->db->prepare("
                 UPDATE forms 
                 SET is_published = ?, public_enabled = ? 
@@ -303,7 +311,7 @@ class FormController extends BaseController {
             $action = $newStatus ? 'publicado' : 'despublicado';
             logAudit('update', 'formularios', "Formulario '{$form['name']}' $action");
             
-            $_SESSION['success'] = $newStatus ? 'Formulario publicado' : 'Formulario despublicado';
+            $_SESSION['success'] = $newStatus ? 'Formulario publicado (otros despublicados)' : 'Formulario despublicado';
             $this->redirect('/formularios');
             
         } catch (PDOException $e) {

@@ -283,10 +283,10 @@ class PublicFormController extends BaseController {
 
                     // Update application with submitted form data and mark as completado
                     // Preserve basic applicant fields (nombre/apellidos/email/telefono) registered at creation
-                    $stmtBasicData = $this->db->prepare("SELECT data_json FROM applications WHERE id = ?");
+                    $stmtBasicData = $this->db->prepare("SELECT form_data FROM applications WHERE id = ?");
                     $stmtBasicData->execute([$applicationId]);
                     $existingAppRow = $stmtBasicData->fetch();
-                    $existingBasic  = json_decode($existingAppRow['data_json'] ?? '{}', true) ?: [];
+                    $existingBasic  = json_decode($existingAppRow['form_data'] ?? '{}', true) ?: [];
                     $basicKeys      = ['nombre', 'apellidos', 'email', 'telefono'];
                     foreach ($basicKeys as $bk) {
                         if (!empty($existingBasic[$bk])) {
@@ -297,7 +297,7 @@ class PublicFormController extends BaseController {
 
                     $this->db->prepare("
                         UPDATE applications
-                        SET form_link_status = 'completado', data_json = ?, progress_percentage = 100
+                        SET form_link_status = 'completado', form_data = ?, progress_percentage = 100
                         WHERE id = ?
                     ")->execute([$submissionData, $applicationId]);
 
@@ -383,28 +383,51 @@ class PublicFormController extends BaseController {
                     SELECT MAX(CAST(SUBSTRING(folio, -6) AS UNSIGNED)) as max_num 
                     FROM applications WHERE folio LIKE ?
                 ");
-                $stmt->execute(["VISA-$year-%"]);
+                $stmt->execute(["FORM-$year-%"]);
                 $result = $stmt->fetch();
                 $nextNum = ($result['max_num'] ?? 0) + 1;
-                $folio = sprintf('VISA-%s-%06d', $year, $nextNum);
+                $folio = sprintf('FORM-%s-%06d', $year, $nextNum);
                 
-                // Create application
+                // Extraer datos del solicitante
+                $applicantName = $this->extractFieldValue($data, ['nombre', 'name', 'full_name', 'nombre_completo', 'Full Name']);
+                $applicantEmail = $this->extractFieldValue($data, ['email', 'correo', 'Email Address', 'correo_electronico']);
+                $applicantPhone = $this->extractFieldValue($data, ['telefono', 'phone', 'Phone Number', 'celular', 'tel']);
+                
+                // Preparar JSON de archivos
+                $attachmentsJson = null;
+                if (!empty($uploadedFiles)) {
+                    $attachmentsArray = [];
+                    foreach ($uploadedFiles as $fieldId => $fileInfo) {
+                        $attachmentsArray[] = [
+                            'field' => $fileInfo['label'],
+                            'filename' => $fileInfo['name'],
+                            'size' => $fileInfo['size'],
+                            'type' => $fileInfo['type']
+                        ];
+                    }
+                    $attachmentsJson = json_encode($attachmentsArray, JSON_UNESCAPED_UNICODE);
+                }
+                
+                // Create application con estructura genérica
                 $stmt = $this->db->prepare("
                     INSERT INTO applications 
-                    (folio, form_id, form_version, type, subtype, status, data_json, 
-                     progress_percentage, is_draft, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+                    (folio, form_id, form_name, applicant_name, applicant_email, applicant_phone,
+                     form_data, attachments_json, is_public_submission, ip_address, user_agent, 
+                     source, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 'nuevo', NOW())
                 ");
                 $stmt->execute([
                     $folio,
                     $form['id'],
-                    $form['version'],
-                    $form['type'],
-                    $form['subtype'],
-                    STATUS_FORMULARIO_RECIBIDO,
+                    $form['name'],
+                    $applicantName,
+                    $applicantEmail,
+                    $applicantPhone,
                     $submissionData,
-                    100,
-                    $form['created_by']
+                    $attachmentsJson,
+                    $ipAddress,
+                    $userAgent,
+                    'Formulario Dinámico - ' . $form['name']
                 ]);
                 
                 $applicationId = $this->db->lastInsertId();
@@ -433,7 +456,7 @@ class PublicFormController extends BaseController {
                                 $relativePath,
                                 $fileInfo['type'],
                                 $fileInfo['size'],
-                                $form['created_by']
+                                null // No hay usuario autenticado en formularios públicos
                             ]);
                         }
                     }
@@ -447,34 +470,6 @@ class PublicFormController extends BaseController {
                 ");
                 $stmt->execute([$applicationId, $submissionId]);
                 
-                // Create initial status history
-                $stmt = $this->db->prepare("
-                    INSERT INTO status_history (application_id, new_status, comment, changed_by)
-                    VALUES (?, ?, ?, ?)
-                ");
-                $stmt->execute([
-                    $applicationId,
-                    STATUS_FORMULARIO_RECIBIDO,
-                    'Solicitud creada desde formulario público',
-                    $form['created_by']
-                ]);
-                
-                // Create financial status
-                $stmt = $this->db->prepare("
-                    INSERT INTO financial_status (application_id, total_costs, total_paid, balance, status)
-                    VALUES (?, 0, 0, 0, ?)
-                ");
-                $stmt->execute([$applicationId, FINANCIAL_PENDIENTE]);
-                
-                // Log customer journey
-                $formName = htmlspecialchars($form['name'], ENT_QUOTES, 'UTF-8');
-                logCustomerJourney(
-                    $applicationId,
-                    'form_submission',
-                    'Formulario público completado',
-                    "Formulario '$formName' completado vía enlace público",
-                    'online'
-                );
                 } // end else (new application)
             }
             
@@ -490,6 +485,19 @@ class PublicFormController extends BaseController {
             http_response_code(500);
             echo json_encode(['error' => 'Error al guardar el formulario']);
         }
+    }
+    
+    /**
+     * Helper function to extract field value from data array
+     * Tries multiple possible field names
+     */
+    private function extractFieldValue($data, $possibleKeys) {
+        foreach ($possibleKeys as $key) {
+            if (isset($data[$key]) && !empty($data[$key])) {
+                return $data[$key];
+            }
+        }
+        return null;
     }
     
     /**
