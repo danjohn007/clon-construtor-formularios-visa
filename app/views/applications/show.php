@@ -202,6 +202,41 @@ $statusClass = $statusColors[$status] ?? 'bg-gray-100 text-gray-800';
         </div>
         <?php endif; ?>
 
+        <!-- Archivos del Formulario (desde attachments_json) -->
+        <?php
+        $attachments = json_decode($application['attachments_json'] ?? '[]', true) ?: [];
+        ?>
+        <?php if (!empty($attachments)): ?>
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-images text-green-600 mr-2"></i>Archivos Enviados por el Cliente
+            </h3>
+            <div class="space-y-3">
+                <?php foreach ($attachments as $att): ?>
+                <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center space-x-3">
+                        <?php
+                        $ext = strtolower($att['type'] ?? '');
+                        $aIcon = 'fa-file'; $aColor = 'text-gray-600';
+                        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif'])) { $aIcon = 'fa-file-image'; $aColor = 'text-blue-600'; }
+                        elseif ($ext === 'pdf') { $aIcon = 'fa-file-pdf'; $aColor = 'text-red-600'; }
+                        elseif (in_array($ext, ['doc', 'docx'])) { $aIcon = 'fa-file-word'; $aColor = 'text-blue-700'; }
+                        ?>
+                        <i class="fas <?= $aIcon ?> <?= $aColor ?> text-2xl"></i>
+                        <div>
+                            <p class="font-medium text-gray-800"><?= htmlspecialchars($att['filename'] ?? 'Archivo') ?></p>
+                            <p class="text-xs text-gray-500">
+                                Campo: <?= htmlspecialchars($att['field'] ?? '-') ?>
+                                &middot; <?= round(($att['size'] ?? 0) / 1024, 1) ?> KB
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- Notas/Indicaciones -->
         <div class="bg-white rounded-lg shadow p-6">
             <div class="flex justify-between items-center mb-4">

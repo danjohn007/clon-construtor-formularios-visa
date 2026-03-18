@@ -33,7 +33,12 @@ class FormBuilder {
                 const parsed = typeof initialData === 'string' ? JSON.parse(initialData) : initialData;
                 if (parsed && parsed.fields && Array.isArray(parsed.fields)) {
                     this.fields = parsed.fields;
-                    this.nextId = this.fields.length + 1;
+                    // Calcular nextId desde el máximo ID existente para evitar duplicados
+                    const maxId = this.fields.reduce((max, f) => {
+                        const match = f.id && f.id.match(/campo_(\d+)/);
+                        return match ? Math.max(max, parseInt(match[1])) : max;
+                    }, 0);
+                    this.nextId = maxId + 1;
                 }
             } catch (e) {
                 console.error('Error parsing initial data:', e);

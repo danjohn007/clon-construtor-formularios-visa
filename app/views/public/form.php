@@ -314,7 +314,7 @@ $contactInfo = [
                             $conditionalStyle = 'style="display: none;"';
                         }
                     ?>
-                    <div class="form-field" data-field-id="<?= htmlspecialchars($field['id']) ?>" <?= $showWhenAttr ?> <?= $conditionalStyle ?> data-page="<?php
+                    <div class="form-field" data-field-id="<?= htmlspecialchars($field['id']) ?>" data-field-label="<?= htmlspecialchars($field['label'] ?? $field['id']) ?>" <?= $showWhenAttr ?> <?= $conditionalStyle ?> data-page="<?php
                         // Find which page this field belongs to
                         $pageAssigned = false;
                         if (!empty($form['pagination_enabled']) && !empty($pages)) {
@@ -347,6 +347,7 @@ $contactInfo = [
                                 <input type="<?= htmlspecialchars($field['type']) ?>" 
                                        name="<?= htmlspecialchars($field['id']) ?>"
                                        id="field_<?= htmlspecialchars($field['id']) ?>"
+                                       data-label="<?= htmlspecialchars($field['label']) ?>"
                                        <?= !empty($field['required']) ? 'required' : '' ?>
                                        class="form-input w-full"
                                        placeholder="">
@@ -355,6 +356,7 @@ $contactInfo = [
                                 <input type="number" 
                                        name="<?= htmlspecialchars($field['id']) ?>"
                                        id="field_<?= htmlspecialchars($field['id']) ?>"
+                                       data-label="<?= htmlspecialchars($field['label']) ?>"
                                        <?= !empty($field['required']) ? 'required' : '' ?>
                                        class="form-input w-full">
                             
@@ -362,12 +364,14 @@ $contactInfo = [
                                 <input type="date" 
                                        name="<?= htmlspecialchars($field['id']) ?>"
                                        id="field_<?= htmlspecialchars($field['id']) ?>"
+                                       data-label="<?= htmlspecialchars($field['label']) ?>"
                                        <?= !empty($field['required']) ? 'required' : '' ?>
                                        class="form-input w-full">
                             
                             <?php elseif ($field['type'] === 'textarea'): ?>
                                 <textarea name="<?= htmlspecialchars($field['id']) ?>"
                                           id="field_<?= htmlspecialchars($field['id']) ?>"
+                                          data-label="<?= htmlspecialchars($field['label']) ?>"
                                           <?= !empty($field['required']) ? 'required' : '' ?>
                                           rows="4"
                                           class="form-input w-full resize-none"
@@ -380,6 +384,7 @@ $contactInfo = [
                                         <input type="radio" 
                                                name="<?= htmlspecialchars($field['id']) ?>"
                                                value="<?= htmlspecialchars($option) ?>"
+                                               data-label="<?= htmlspecialchars($field['label']) ?>"
                                                <?= !empty($field['required']) ? 'required' : '' ?>
                                                class="custom-radio">
                                         <span class="ml-3 text-gray-700 font-medium uppercase text-xs tracking-wide">
@@ -394,6 +399,7 @@ $contactInfo = [
                                     <input type="checkbox" 
                                            name="<?= htmlspecialchars($field['id']) ?>"
                                            id="field_<?= htmlspecialchars($field['id']) ?>"
+                                           data-label="<?= htmlspecialchars($field['label']) ?>"
                                            <?= !empty($field['required']) ? 'required' : '' ?>
                                            class="w-5 h-5 text-green-500 rounded focus:ring-green-500">
                                     <label for="field_<?= htmlspecialchars($field['id']) ?>" class="ml-3 text-sm text-gray-700 font-medium">
@@ -402,9 +408,13 @@ $contactInfo = [
                                 </div>
                             
                             <?php elseif ($field['type'] === 'file'): ?>
+                                <?php $isMultiple = !empty($field['multiple']); ?>
                                 <input type="file" 
-                                       name="<?= htmlspecialchars($field['id']) ?>"
+                                       name="<?= htmlspecialchars($field['id']) ?><?= $isMultiple ? '[]' : '' ?>"
                                        id="field_<?= htmlspecialchars($field['id']) ?>"
+                                       data-label="<?= htmlspecialchars($field['label']) ?>"
+                                       <?= $isMultiple ? 'multiple' : '' ?>
+                                       accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt,.xlsx,.xls"
                                        <?= !empty($field['required']) ? 'required' : '' ?>
                                        class="form-input w-full file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
                                 <p class="text-xs text-gray-500 mt-2">
@@ -476,161 +486,247 @@ $contactInfo = [
         const AUTOSAVE_DELAY_MS = 3000;
         const paginationEnabled = <?= json_encode($form['pagination_enabled'] ?? false) ?>;
         const pages = <?= json_encode($pages ?? []) ?>;
-        const totalPages = pages.length || 1;
         const FORM_ID = '<?= $formId ?>';
         const LOCALSTORAGE_KEY = `form_draft_${FORM_ID}`;
         
         let currentPage = 1;
+        let visiblePages = [];
         let autosaveTimeout;
         
-        // Load draft from localStorage
-        loadDraftFromLocalStorage();
-        
-        // Initialize pagination
-        if (paginationEnabled && pages.length > 0) {
-            initializePagination();
-            showPage(1);
-        }
-        
-        // Auto-save on input change - solo guarda en localStorage (NO envía al servidor)
-        form.addEventListener('input', function() {
-            clearTimeout(autosaveTimeout);
-            autosaveTimeout = setTimeout(function() {
-                saveDraftToLocalStorage();
-                // NO enviar al servidor automáticamente
-            }, AUTOSAVE_DELAY_MS);
-        });
-        
-        // Save draft button - solo guarda en localStorage (NO envía al servidor)
-        if (saveDraftBtn) {
-            saveDraftBtn.addEventListener('click', function() {
-                saveDraftToLocalStorage();
+        // ==========================================
+        // CONDITIONAL FIELDS MANAGER
+        // ==========================================
+        const conditionalManager = {
+            fields: [],
+            
+            init() {
+                console.log('🔗 Inicializando ConditionalFieldsManager...');
+                const els = document.querySelectorAll('[data-show-when]');
+                console.log('📋 Campos condicionales encontrados:', els.length);
                 
-                // Mostrar feedback visual
-                autosaveStatus.classList.remove('hidden');
-                autosaveText.textContent = '✓ Borrador guardado localmente';
-                setTimeout(() => {
-                    autosaveStatus.classList.add('hidden');
-                }, 3000);
-            });
-        }
-        
-        // Form submission
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            saveFormData(true);
-        });
-        
-        // Pagination buttons
-        if (prevPageBtn) {
-            prevPageBtn.addEventListener('click', function() {
-                if (currentPage > 1) {
-                    showPage(currentPage - 1);
-                }
-            });
-        }
-        
-        if (nextPageBtn) {
-            nextPageBtn.addEventListener('click', function() {
-                if (validateCurrentPage() && currentPage < totalPages) {
-                    showPage(currentPage + 1);
-                }
-            });
-        }
-        
-        function initializePagination() {
-            if (totalPages > 1) {
-                saveDraftBtn.classList.remove('hidden');
+                els.forEach(el => {
+                    try {
+                        const sw = JSON.parse(el.getAttribute('data-show-when'));
+                        if (sw && sw.fieldId && sw.value) {
+                            this.fields.push({
+                                element: el,
+                                parentFieldId: sw.fieldId,
+                                requiredValue: sw.value,
+                                fieldId: el.getAttribute('data-field-id'),
+                                page: parseInt(el.getAttribute('data-page')) || 1
+                            });
+                        }
+                    } catch(e) { console.error('Error parsing showWhen:', e); }
+                });
+                
+                // Ocultar todos los condicionales
+                this.fields.forEach(f => {
+                    f.element.style.display = 'none';
+                    f.element.classList.add('conditional-hidden');
+                });
+                
+                // Listeners en campos padre
+                const parentIds = [...new Set(this.fields.map(f => f.parentFieldId))];
+                console.log('🎯 Campos padre:', parentIds);
+                parentIds.forEach(pid => {
+                    document.querySelectorAll(`input[name="${pid}"]`).forEach(radio => {
+                        radio.addEventListener('change', () => {
+                            console.log(`🔄 Cambio: "${pid}" → "${radio.value}"`);
+                            // Limpiar valores de campos que se van a ocultar
+                            this.fields.filter(f => f.parentFieldId === pid).forEach(f => {
+                                if (radio.value !== f.requiredValue) {
+                                    this.clearFieldValues(f.element);
+                                }
+                            });
+                            // Recalcular páginas visibles y refrescar vista actual
+                            recalculateVisiblePages();
+                            showPage(currentPage);
+                        });
+                    });
+                });
+            },
+            
+            shouldShowField(fieldDiv) {
+                if (!fieldDiv.hasAttribute('data-show-when')) return true;
+                try {
+                    const sw = JSON.parse(fieldDiv.getAttribute('data-show-when'));
+                    return this.getFieldValue(sw.fieldId) === sw.value;
+                } catch(e) { return false; }
+            },
+            
+            getFieldValue(fieldId) {
+                const radio = document.querySelector(`input[name="${fieldId}"]:checked`);
+                if (radio) return radio.value;
+                const input = document.getElementById(`field_${fieldId}`);
+                if (input) return input.type === 'checkbox' ? (input.checked ? 'true' : 'false') : input.value;
+                return null;
+            },
+            
+            clearFieldValues(container) {
+                container.querySelectorAll('input:not([type="hidden"]), textarea').forEach(input => {
+                    if (input.type === 'checkbox' || input.type === 'radio') input.checked = false;
+                    else input.value = '';
+                    input.classList.remove('border-red-500');
+                });
             }
+        };
+        window.conditionalManager = conditionalManager;
+        
+        // ==========================================
+        // PAGINACIÓN DINÁMICA (salta páginas vacías)
+        // ==========================================
+        function recalculateVisiblePages() {
+            if (!paginationEnabled) { visiblePages = [1]; return; }
+            
+            const pagesWithContent = new Set();
+            document.querySelectorAll('.form-field').forEach(field => {
+                const page = parseInt(field.dataset.page) || 1;
+                if (conditionalManager.shouldShowField(field)) {
+                    pagesWithContent.add(page);
+                }
+            });
+            visiblePages = Array.from(pagesWithContent).sort((a, b) => a - b);
+            if (visiblePages.length === 0) visiblePages = [1];
+            console.log('📄 Páginas visibles:', visiblePages);
         }
         
         function showPage(pageNum) {
+            // Si la página ya no es visible, ir a la más cercana
+            if (paginationEnabled && !visiblePages.includes(pageNum)) {
+                const closest = visiblePages.reduce((prev, curr) => 
+                    Math.abs(curr - pageNum) < Math.abs(prev - pageNum) ? curr : prev, visiblePages[0]);
+                pageNum = closest;
+            }
+            
             currentPage = pageNum;
             currentPageInput.value = pageNum;
             
-            // Hide all fields
-            document.querySelectorAll('.form-field').forEach(field => {
-                field.style.display = 'none';
-            });
+            // Ocultar todos los campos
+            document.querySelectorAll('.form-field').forEach(f => f.style.display = 'none');
             
-            // Show fields for current page
-            document.querySelectorAll(`[data-page="${pageNum}"]`).forEach(field => {
-                field.style.display = 'block';
-            });
-            
-            // Update step indicator
-            const stepNumber = document.getElementById('current-step-number');
-            const stepTitle = document.getElementById('step-title');
-            if (stepNumber) {
-                stepNumber.textContent = pageNum.toString().padStart(2, '0');
-            }
-            if (stepTitle && pages[pageNum - 1]) {
-                stepTitle.textContent = pages[pageNum - 1].name;
-            }
-            
-            // Update buttons
-            prevPageBtn.classList.toggle('hidden', pageNum === 1);
-            
-            if (pageNum === totalPages) {
-                nextPageBtn.classList.add('hidden');
-                submitBtn.classList.remove('hidden');
+            if (paginationEnabled) {
+                // Mostrar solo campos de esta página cuya condición se cumple
+                document.querySelectorAll(`[data-page="${pageNum}"]`).forEach(field => {
+                    if (conditionalManager.shouldShowField(field)) {
+                        field.style.display = 'block';
+                        field.classList.remove('conditional-hidden');
+                    }
+                });
             } else {
-                nextPageBtn.classList.remove('hidden');
-                submitBtn.classList.add('hidden');
+                // Sin paginación: mostrar todos los que deben ser visibles
+                document.querySelectorAll('.form-field').forEach(field => {
+                    if (conditionalManager.shouldShowField(field)) {
+                        field.style.display = 'block';
+                        field.classList.remove('conditional-hidden');
+                    }
+                });
             }
             
-            // Calculate and update progress
-            calculateProgress();
-            
-            // Scroll to top
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            updateStepIndicator();
+            updateNavigation();
+            updateProgress();
         }
         
-        function validateCurrentPage() {
-            const currentPageFields = document.querySelectorAll(`[data-page="${currentPage}"]`);
-            let isValid = true;
+        function updateStepIndicator() {
+            const stepNumber = document.getElementById('current-step-number');
+            const stepTitle = document.getElementById('step-title');
+            const visibleIndex = visiblePages.indexOf(currentPage);
             
-            currentPageFields.forEach(fieldDiv => {
-                // Solo validar campos visibles y requeridos (excluir campos ocultos)
-                const inputs = fieldDiv.querySelectorAll('input[required]:not([type="hidden"]), select[required], textarea[required]');
-                inputs.forEach(input => {
-                    if (!input.checkValidity()) {
-                        input.reportValidity();
-                        isValid = false;
+            if (stepNumber) stepNumber.textContent = (visibleIndex + 1).toString().padStart(2, '0');
+            if (stepTitle && pages[currentPage - 1]) stepTitle.textContent = pages[currentPage - 1].name;
+        }
+        
+        function updateNavigation() {
+            if (!paginationEnabled) {
+                if (prevPageBtn) prevPageBtn.classList.add('hidden');
+                if (nextPageBtn) nextPageBtn.classList.add('hidden');
+                submitBtn.classList.remove('hidden');
+                return;
+            }
+            
+            const idx = visiblePages.indexOf(currentPage);
+            const isFirst = idx <= 0;
+            const isLast = idx >= visiblePages.length - 1;
+            
+            if (prevPageBtn) prevPageBtn.classList.toggle('hidden', isFirst);
+            if (nextPageBtn) nextPageBtn.classList.toggle('hidden', isLast);
+            submitBtn.classList.toggle('hidden', !isLast);
+        }
+        
+        function updateProgress() {
+            const bar = document.getElementById('progress-bar');
+            if (bar && visiblePages.length > 0) {
+                const idx = visiblePages.indexOf(currentPage);
+                bar.style.width = ((idx + 1) / visiblePages.length * 100) + '%';
+            }
+        }
+        
+        // ==========================================
+        // VALIDACIÓN
+        // ==========================================
+        function validateCurrentPage() {
+            let isValid = true;
+            let firstInvalid = null;
+            
+            document.querySelectorAll(`[data-page="${currentPage}"]`).forEach(fieldDiv => {
+                if (fieldDiv.style.display === 'none') return;
+                
+                fieldDiv.querySelectorAll('input:not([type="hidden"]), textarea').forEach(input => {
+                    input.classList.remove('border-red-500');
+                    
+                    if (input.hasAttribute('required')) {
+                        if (input.type === 'radio') {
+                            if (!document.querySelector(`input[name="${input.name}"]:checked`)) {
+                                input.classList.add('border-red-500');
+                                isValid = false;
+                                if (!firstInvalid) firstInvalid = input;
+                            }
+                            return;
+                        }
+                        if (input.type === 'file') {
+                            if (input.files.length === 0) {
+                                input.classList.add('border-red-500');
+                                isValid = false;
+                                if (!firstInvalid) firstInvalid = input;
+                            }
+                            return;
+                        }
+                        if (!input.value.trim()) {
+                            input.classList.add('border-red-500');
+                            isValid = false;
+                            if (!firstInvalid) firstInvalid = input;
+                            return;
+                        }
+                    }
+                    
+                    if (input.type === 'email' && input.value) {
+                        if (!/^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/i.test(input.value)) {
+                            input.classList.add('border-red-500');
+                            isValid = false;
+                            if (!firstInvalid) firstInvalid = input;
+                        }
+                    }
+                    
+                    if (input.type === 'tel' && input.value) {
+                        if (!/[\(]?[0-9]{3}[\)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4}/.test(input.value)) {
+                            input.classList.add('border-red-500');
+                            isValid = false;
+                            if (!firstInvalid) firstInvalid = input;
+                        }
                     }
                 });
             });
             
+            if (!isValid && firstInvalid) {
+                firstInvalid.focus();
+                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
             return isValid;
         }
         
-        function calculateProgress() {
-            const allFields = document.querySelectorAll('.form-field');
-            let filledFields = 0;
-            let totalFields = 0;
-            
-            allFields.forEach(fieldDiv => {
-                const pageNum = parseInt(fieldDiv.dataset.page);
-                if (pageNum <= currentPage) {
-                    totalFields++;
-                    const input = fieldDiv.querySelector('input, select, textarea');
-                    if (input && input.value && input.value.trim() !== '') {
-                        filledFields++;
-                    }
-                }
-            });
-            
-            const percentage = totalFields > 0 ? (filledFields / totalFields) * 100 : 0;
-            updateProgress(percentage);
-        }
-        
-        function updateProgress(percentage) {
-            const progressBar = document.getElementById('progress-bar');
-            if (progressBar) {
-                progressBar.style.width = percentage + '%';
-            }
-        }
-        
+        // ==========================================
+        // LOCALSTORAGE DRAFT (preserved from original)
+        // ==========================================
         function saveDraftToLocalStorage() {
             try {
                 const formData = new FormData(form);
@@ -650,7 +746,7 @@ $contactInfo = [
                         const field = form.querySelector(`[name="${key}"]`);
                         if (field) {
                             if (field.type === 'checkbox') {
-                                field.checked = value === 'on';
+                                field.checked = value === 'on' || value === 'Yes';
                             } else if (field.type === 'radio') {
                                 const radio = form.querySelector(`[name="${key}"][value="${value}"]`);
                                 if (radio) radio.checked = true;
@@ -665,60 +761,75 @@ $contactInfo = [
             }
         }
         
+        // ==========================================
+        // SUBMIT - Usa FormData para soportar archivos
+        // ==========================================
         function saveFormData(isCompleted, callback, errorCallback) {
             submitBtn.disabled = true;
-            saveDraftBtn.disabled = true;
+            if (saveDraftBtn) saveDraftBtn.disabled = true;
             
-            if (!isCompleted) {
+            if (isCompleted) {
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>SENDING...';
+            } else {
                 autosaveStatus.classList.remove('hidden');
                 autosaveText.textContent = 'Guardando...';
             }
             
-            const data = {};
+            const newFormData = new FormData();
             
-            // Collect form data con labels descriptivos
-            const formData = new FormData(form);
-            for (const [key, value] of formData.entries()) {
-                const field = form.querySelector(`[name="${key}"]`);
-                if (field) {
-                    // Obtener el label del campo para usar como key descriptivo
-                    const fieldContainer = field.closest('.form-field');
-                    let fieldLabel = key; // default al ID si no se encuentra label
+            // Metadata
+            newFormData.append('form_source', 'constructor');
+            const formIdInput = form.querySelector('[name="form_id"]');
+            if (formIdInput) newFormData.append('form_id', formIdInput.value);
+            if (submissionIdInput && submissionIdInput.value) {
+                newFormData.append('submissionId', submissionIdInput.value);
+            }
+            newFormData.append('currentPage', currentPageInput.value);
+            
+            // Recolectar campos de TODAS las páginas cuya condición se cumple
+            const addedRadioGroups = new Set();
+            
+            document.querySelectorAll('.form-field').forEach(fieldDiv => {
+                if (!conditionalManager.shouldShowField(fieldDiv)) return;
+                
+                fieldDiv.querySelectorAll('input:not([type="hidden"]), textarea, select').forEach(input => {
+                    const label = input.getAttribute('data-label') || input.name;
                     
-                    if (fieldContainer) {
-                        const labelElement = fieldContainer.querySelector('label');
-                        if (labelElement) {
-                            // Limpiar el texto del label (remover asterisco de requerido y espacios)
-                            fieldLabel = labelElement.textContent.trim().replace(/\*\s*$/, '').trim();
+                    if (input.type === 'file') {
+                        if (input.files.length > 0) {
+                            for (let i = 0; i < input.files.length; i++) {
+                                newFormData.append(input.multiple ? label + '[]' : label, input.files[i]);
+                            }
                         }
-                    }
-                    
-                    // Por ahora ignoramos archivos (send_quote.php no los maneja)
-                    if (field.type === 'file') {
-                        if (field.files && field.files[0]) {
-                            data[fieldLabel] = field.files[0].name + ' (archivo adjunto)';
+                    } else if (input.type === 'checkbox') {
+                        if (input.checked) {
+                            newFormData.append(label, 'Yes');
+                        }
+                    } else if (input.type === 'radio') {
+                        if (!addedRadioGroups.has(input.name)) {
+                            const checked = document.querySelector(`input[name="${input.name}"]:checked`);
+                            if (checked) {
+                                newFormData.append(label, checked.value);
+                                addedRadioGroups.add(input.name);
+                            }
                         }
                     } else {
-                        data[fieldLabel] = value;
+                        if (input.value.trim()) {
+                            newFormData.append(label, input.value);
+                        }
                     }
-                }
-            }
+                });
+            });
             
-            // Agregar metadata
-            data['submissionId'] = submissionIdInput.value || '';
-            data['currentPage'] = currentPageInput.value;
+            console.log('📦 Enviando formulario con FormData (soporta archivos)...');
             
-            // Enviar a send_quote.php en formato JSON
             fetch('/send_quote.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
+                body: newFormData
             })
             .then(response => response.json())
             .then(result => {
-                if (result.status === 'success') {
+                if (result.status === 'success' || result.success) {
                     if (isCompleted) {
                         try {
                             localStorage.removeItem(LOCALSTORAGE_KEY);
@@ -728,7 +839,6 @@ $contactInfo = [
                         
                         form.style.display = 'none';
                         successMessage.classList.remove('hidden');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
                     } else {
                         autosaveText.textContent = '✓ Guardado';
                         setTimeout(() => {
@@ -749,183 +859,83 @@ $contactInfo = [
             })
             .finally(() => {
                 submitBtn.disabled = false;
-                saveDraftBtn.disabled = false;
+                submitBtn.innerHTML = 'SUBMIT <i class="fas fa-arrow-right ml-2"></i>';
+                if (saveDraftBtn) saveDraftBtn.disabled = false;
             });
         }
         
-        // ========================================================================
-        // CLASE: ConditionalFieldsManager
-        // ========================================================================
-        // Maneja la lógica de campos condicionales (showWhen)
-        // Un campo se muestra solo si el campo padre tiene el valor especificado
-        // ========================================================================
-        class ConditionalFieldsManager {
-            constructor() {
-                console.log('🔧 Creando ConditionalFieldsManager...');
-                this.conditionalFields = [];
-                this.parentFields = new Set();
-            }
-            
-            init() {
-                console.log('🔗 Inicializando ConditionalFieldsManager...');
-                
-                // Encontrar todos los campos con data-show-when
-                const conditionalElements = document.querySelectorAll('[data-show-when]');
-                console.log(`📋 Campos condicionales encontrados: ${conditionalElements.length}`);
-                
-                conditionalElements.forEach(el => {
-                    try {
-                        const showWhenData = JSON.parse(el.dataset.showWhen);
-                        const fieldId = el.dataset.fieldId;
-                        
-                        console.log(`✓ Campo "${fieldId}" depende de "${showWhenData.fieldId}" = "${showWhenData.value}"`);
-                        
-                        this.conditionalFields.push({
-                            element: el,
-                            fieldId: fieldId,
-                            dependsOn: showWhenData.fieldId,
-                            requiredValue: showWhenData.value
-                        });
-                        
-                        this.parentFields.add(showWhenData.fieldId);
-                    } catch (e) {
-                        console.error('❌ Error parseando showWhen:', e, el);
-                    }
-                });
-                
-                // Ocultar todos los campos condicionales inicialmente
-                console.log('🙈 Ocultando todos los campos condicionales...');
-                this.hideAllConditionalFields();
-                
-                // Adjuntar listeners a campos padre
-                console.log(`🎯 Adjuntando listeners a ${this.parentFields.size} campos padre:`, Array.from(this.parentFields));
-                this.attachParentListeners();
-                
-                // Evaluar condiciones iniciales (por si hay valores cargados)
-                console.log('🔍 Evaluando condiciones iniciales...');
-                this.evaluateAllConditions();
-            }
-            
-            hideAllConditionalFields() {
-                this.conditionalFields.forEach(cf => {
-                    this.hideField(cf.element, cf.fieldId);
-                });
-            }
-            
-            attachParentListeners() {
-                this.parentFields.forEach(parentFieldId => {
-                    // Buscar inputs con ese name (radio buttons, selects, etc)
-                    const parentInputs = document.querySelectorAll(`[name="${parentFieldId}"]`);
-                    
-                    if (parentInputs.length === 0) {
-                        console.warn(`⚠️ No se encontró el campo padre: ${parentFieldId}`);
-                        return;
-                    }
-                    
-                    parentInputs.forEach(input => {
-                        input.addEventListener('change', (e) => {
-                            const fieldId = e.target.name;
-                            const value = this.getFieldValue(fieldId);
-                            console.log(`🔄 Cambio detectado en "${fieldId}" → valor: "${value}"`);
-                            this.evaluateConditionsForParent(fieldId);
-                        });
-                    });
-                });
-            }
-            
-            evaluateConditionsForParent(parentFieldId) {
-                const parentValue = this.getFieldValue(parentFieldId);
-                
-                this.conditionalFields
-                    .filter(cf => cf.dependsOn === parentFieldId)
-                    .forEach(cf => {
-                        const shouldShow = this.evaluateCondition(cf, parentValue);
-                        if (shouldShow) {
-                            this.showField(cf.element, cf.fieldId);
-                        } else {
-                            this.hideField(cf.element, cf.fieldId);
-                        }
-                    });
-            }
-            
-            evaluateAllConditions() {
-                this.parentFields.forEach(parentFieldId => {
-                    this.evaluateConditionsForParent(parentFieldId);
-                });
-            }
-            
-            evaluateCondition(conditionalField, actualValue) {
-                const match = actualValue === conditionalField.requiredValue;
-                console.log(
-                    `${match ? '✅ MOSTRAR' : '❌ OCULTAR'} campo "${conditionalField.fieldId}" ` +
-                    `(esperado: "${conditionalField.requiredValue}", actual: "${actualValue}")`
-                );
-                return match;
-            }
-            
-            showField(element, fieldId) {
-                element.style.display = 'block';
-                console.log(`👁️ Campo "${fieldId}" ahora visible`);
-            }
-            
-            hideField(element, fieldId) {
-                element.style.display = 'none';
-                this.clearFieldValues(element);
-                console.log(`🚫 Campo "${fieldId}" ahora oculto`);
-            }
-            
-            clearFieldValues(container) {
-                const inputs = container.querySelectorAll('input, select, textarea');
-                inputs.forEach(input => {
-                    if (input.type === 'checkbox' || input.type === 'radio') {
-                        input.checked = false;
-                    } else {
-                        input.value = '';
-                    }
-                });
-            }
-            
-            getFieldValue(fieldId) {
-                // Para radio buttons
-                const radioChecked = document.querySelector(`input[name="${fieldId}"]:checked`);
-                if (radioChecked) {
-                    return radioChecked.value;
-                }
-                
-                // Para otros tipos de input
-                const input = document.querySelector(`[name="${fieldId}"]`);
-                if (input) {
-                    if (input.type === 'checkbox') {
-                        return input.checked ? input.value : '';
-                    }
-                    return input.value;
-                }
-                
-                return '';
-            }
+        // ==========================================
+        // EVENT LISTENERS
+        // ==========================================
+        form.addEventListener('input', function(e) {
+            if (e.target.classList) e.target.classList.remove('border-red-500');
+            clearTimeout(autosaveTimeout);
+            autosaveTimeout = setTimeout(function() {
+                saveDraftToLocalStorage();
+            }, AUTOSAVE_DELAY_MS);
+        });
+        
+        if (saveDraftBtn) {
+            saveDraftBtn.addEventListener('click', function() {
+                saveDraftToLocalStorage();
+                autosaveStatus.classList.remove('hidden');
+                autosaveText.textContent = '✓ Borrador guardado localmente';
+                setTimeout(() => {
+                    autosaveStatus.classList.add('hidden');
+                }, 3000);
+            });
         }
         
-        // ========================================================================
-        // INICIALIZACIÓN DE CONDICIONALES
-        // ========================================================================
-        console.log('🎬 Inicializando sistema de campos condicionales...');
-        window.conditionalManager = new ConditionalFieldsManager();
-        window.conditionalManager.init();
-        console.log('✅ ConditionalFieldsManager listo');
+        if (prevPageBtn) {
+            prevPageBtn.addEventListener('click', () => {
+                recalculateVisiblePages();
+                const idx = visiblePages.indexOf(currentPage);
+                if (idx > 0) showPage(visiblePages[idx - 1]);
+            });
+        }
         
-        // ========================================================================
-        // MOSTRAR PÁGINA INICIAL O CAMPOS
-        // ========================================================================
+        if (nextPageBtn) {
+            nextPageBtn.addEventListener('click', () => {
+                if (validateCurrentPage()) {
+                    recalculateVisiblePages();
+                    const idx = visiblePages.indexOf(currentPage);
+                    if (idx < visiblePages.length - 1) showPage(visiblePages[idx + 1]);
+                }
+            });
+        }
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (validateCurrentPage()) saveFormData(true);
+        });
+        
+        // ==========================================
+        // INICIALIZACIÓN
+        // ==========================================
+        // Load draft from localStorage first
+        loadDraftFromLocalStorage();
+        
+        // Init conditional fields
+        conditionalManager.init();
+        recalculateVisiblePages();
+        
+        if (paginationEnabled && visiblePages.length > 1) {
+            saveDraftBtn.classList.remove('hidden');
+        }
+        
         if (paginationEnabled && pages.length > 0) {
-            console.log('📄 Mostrando página 1 (paginación habilitada)');
-            // showPage ya fue llamado arriba, pero ahora los condicionales están listos
+            showPage(visiblePages[0] || 1);
         } else {
-            console.log('📄 Mostrando todos los campos (sin paginación)');
-            // Mostrar campos no condicionales (los condicionales ya fueron manejados)
-            document.querySelectorAll('.form-field:not([data-show-when])').forEach(field => {
-                field.style.display = 'block';
+            document.querySelectorAll('.form-field').forEach(field => {
+                if (conditionalManager.shouldShowField(field)) {
+                    field.style.display = 'block';
+                }
             });
+            updateNavigation();
         }
+        
+        updateProgress();
+        console.log('✅ Formulario inicializado correctamente');
         
         }); // FIN DOMContentLoaded
     </script>
