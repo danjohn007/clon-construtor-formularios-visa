@@ -301,7 +301,20 @@ $contactInfo = [
                     <input type="hidden" id="current-page" value="1">
                     
                     <?php foreach ($fields['fields'] as $field): ?>
-                    <div class="form-field" data-field-id="<?= htmlspecialchars($field['id']) ?>" data-page="<?php
+                    <?php
+                        // Preparar atributos para campos condicionales
+                        $showWhenAttr = '';
+                        $conditionalStyle = '';
+                        if (isset($field['showWhen']) && !empty($field['showWhen']['fieldId'])) {
+                            $showWhenAttr = sprintf(
+                                'data-show-when=\'%s\'',
+                                htmlspecialchars(json_encode($field['showWhen']), ENT_QUOTES, 'UTF-8')
+                            );
+                            // Ocultar por defecto los campos condicionales
+                            $conditionalStyle = 'style="display: none;"';
+                        }
+                    ?>
+                    <div class="form-field" data-field-id="<?= htmlspecialchars($field['id']) ?>" <?= $showWhenAttr ?> <?= $conditionalStyle ?> data-page="<?php
                         // Find which page this field belongs to
                         $pageAssigned = false;
                         if (!empty($form['pagination_enabled']) && !empty($pages)) {
@@ -445,16 +458,19 @@ $contactInfo = [
     </div>
 
     <script>
-        const form = document.getElementById('public-form');
-        const submitBtn = document.getElementById('submit-btn');
-        const saveDraftBtn = document.getElementById('save-draft-btn');
-        const prevPageBtn = document.getElementById('prev-page-btn');
-        const nextPageBtn = document.getElementById('next-page-btn');
-        const autosaveStatus = document.getElementById('autosave-status');
-        const autosaveText = document.getElementById('autosave-text');
-        const successMessage = document.getElementById('success-message');
-        const submissionIdInput = document.getElementById('submission-id');
-        const currentPageInput = document.getElementById('current-page');
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Inicializando formulario del sistema...');
+            
+            const form = document.getElementById('public-form');
+            const submitBtn = document.getElementById('submit-btn');
+            const saveDraftBtn = document.getElementById('save-draft-btn');
+            const prevPageBtn = document.getElementById('prev-page-btn');
+            const nextPageBtn = document.getElementById('next-page-btn');
+            const autosaveStatus = document.getElementById('autosave-status');
+            const autosaveText = document.getElementById('autosave-text');
+            const successMessage = document.getElementById('success-message');
+            const submissionIdInput = document.getElementById('submission-id');
+            const currentPageInput = document.getElementById('current-page');
         
         // Configuration
         const AUTOSAVE_DELAY_MS = 3000;
@@ -736,6 +752,182 @@ $contactInfo = [
                 saveDraftBtn.disabled = false;
             });
         }
+        
+        // ========================================================================
+        // CLASE: ConditionalFieldsManager
+        // ========================================================================
+        // Maneja la lógica de campos condicionales (showWhen)
+        // Un campo se muestra solo si el campo padre tiene el valor especificado
+        // ========================================================================
+        class ConditionalFieldsManager {
+            constructor() {
+                console.log('🔧 Creando ConditionalFieldsManager...');
+                this.conditionalFields = [];
+                this.parentFields = new Set();
+            }
+            
+            init() {
+                console.log('🔗 Inicializando ConditionalFieldsManager...');
+                
+                // Encontrar todos los campos con data-show-when
+                const conditionalElements = document.querySelectorAll('[data-show-when]');
+                console.log(`📋 Campos condicionales encontrados: ${conditionalElements.length}`);
+                
+                conditionalElements.forEach(el => {
+                    try {
+                        const showWhenData = JSON.parse(el.dataset.showWhen);
+                        const fieldId = el.dataset.fieldId;
+                        
+                        console.log(`✓ Campo "${fieldId}" depende de "${showWhenData.fieldId}" = "${showWhenData.value}"`);
+                        
+                        this.conditionalFields.push({
+                            element: el,
+                            fieldId: fieldId,
+                            dependsOn: showWhenData.fieldId,
+                            requiredValue: showWhenData.value
+                        });
+                        
+                        this.parentFields.add(showWhenData.fieldId);
+                    } catch (e) {
+                        console.error('❌ Error parseando showWhen:', e, el);
+                    }
+                });
+                
+                // Ocultar todos los campos condicionales inicialmente
+                console.log('🙈 Ocultando todos los campos condicionales...');
+                this.hideAllConditionalFields();
+                
+                // Adjuntar listeners a campos padre
+                console.log(`🎯 Adjuntando listeners a ${this.parentFields.size} campos padre:`, Array.from(this.parentFields));
+                this.attachParentListeners();
+                
+                // Evaluar condiciones iniciales (por si hay valores cargados)
+                console.log('🔍 Evaluando condiciones iniciales...');
+                this.evaluateAllConditions();
+            }
+            
+            hideAllConditionalFields() {
+                this.conditionalFields.forEach(cf => {
+                    this.hideField(cf.element, cf.fieldId);
+                });
+            }
+            
+            attachParentListeners() {
+                this.parentFields.forEach(parentFieldId => {
+                    // Buscar inputs con ese name (radio buttons, selects, etc)
+                    const parentInputs = document.querySelectorAll(`[name="${parentFieldId}"]`);
+                    
+                    if (parentInputs.length === 0) {
+                        console.warn(`⚠️ No se encontró el campo padre: ${parentFieldId}`);
+                        return;
+                    }
+                    
+                    parentInputs.forEach(input => {
+                        input.addEventListener('change', (e) => {
+                            const fieldId = e.target.name;
+                            const value = this.getFieldValue(fieldId);
+                            console.log(`🔄 Cambio detectado en "${fieldId}" → valor: "${value}"`);
+                            this.evaluateConditionsForParent(fieldId);
+                        });
+                    });
+                });
+            }
+            
+            evaluateConditionsForParent(parentFieldId) {
+                const parentValue = this.getFieldValue(parentFieldId);
+                
+                this.conditionalFields
+                    .filter(cf => cf.dependsOn === parentFieldId)
+                    .forEach(cf => {
+                        const shouldShow = this.evaluateCondition(cf, parentValue);
+                        if (shouldShow) {
+                            this.showField(cf.element, cf.fieldId);
+                        } else {
+                            this.hideField(cf.element, cf.fieldId);
+                        }
+                    });
+            }
+            
+            evaluateAllConditions() {
+                this.parentFields.forEach(parentFieldId => {
+                    this.evaluateConditionsForParent(parentFieldId);
+                });
+            }
+            
+            evaluateCondition(conditionalField, actualValue) {
+                const match = actualValue === conditionalField.requiredValue;
+                console.log(
+                    `${match ? '✅ MOSTRAR' : '❌ OCULTAR'} campo "${conditionalField.fieldId}" ` +
+                    `(esperado: "${conditionalField.requiredValue}", actual: "${actualValue}")`
+                );
+                return match;
+            }
+            
+            showField(element, fieldId) {
+                element.style.display = 'block';
+                console.log(`👁️ Campo "${fieldId}" ahora visible`);
+            }
+            
+            hideField(element, fieldId) {
+                element.style.display = 'none';
+                this.clearFieldValues(element);
+                console.log(`🚫 Campo "${fieldId}" ahora oculto`);
+            }
+            
+            clearFieldValues(container) {
+                const inputs = container.querySelectorAll('input, select, textarea');
+                inputs.forEach(input => {
+                    if (input.type === 'checkbox' || input.type === 'radio') {
+                        input.checked = false;
+                    } else {
+                        input.value = '';
+                    }
+                });
+            }
+            
+            getFieldValue(fieldId) {
+                // Para radio buttons
+                const radioChecked = document.querySelector(`input[name="${fieldId}"]:checked`);
+                if (radioChecked) {
+                    return radioChecked.value;
+                }
+                
+                // Para otros tipos de input
+                const input = document.querySelector(`[name="${fieldId}"]`);
+                if (input) {
+                    if (input.type === 'checkbox') {
+                        return input.checked ? input.value : '';
+                    }
+                    return input.value;
+                }
+                
+                return '';
+            }
+        }
+        
+        // ========================================================================
+        // INICIALIZACIÓN DE CONDICIONALES
+        // ========================================================================
+        console.log('🎬 Inicializando sistema de campos condicionales...');
+        window.conditionalManager = new ConditionalFieldsManager();
+        window.conditionalManager.init();
+        console.log('✅ ConditionalFieldsManager listo');
+        
+        // ========================================================================
+        // MOSTRAR PÁGINA INICIAL O CAMPOS
+        // ========================================================================
+        if (paginationEnabled && pages.length > 0) {
+            console.log('📄 Mostrando página 1 (paginación habilitada)');
+            // showPage ya fue llamado arriba, pero ahora los condicionales están listos
+        } else {
+            console.log('📄 Mostrando todos los campos (sin paginación)');
+            // Mostrar campos no condicionales (los condicionales ya fueron manejados)
+            document.querySelectorAll('.form-field:not([data-show-when])').forEach(field => {
+                field.style.display = 'block';
+            });
+        }
+        
+        }); // FIN DOMContentLoaded
     </script>
 </body>
 </html>
