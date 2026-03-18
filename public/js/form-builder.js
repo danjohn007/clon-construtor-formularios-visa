@@ -857,51 +857,99 @@ class FormBuilder {
             }
         });
         
-        // Track last page per condition for sibling-aware assignment
-        const lastPagePerCondition = new Map();
-        let lastAssignedPageId = this.pages[0].id;
-        let orphanCount = 0;
+        // Section-based assignment: labels define section boundaries
+        // All fields in a section go to the SAME page
+        const sections = [];
+        let curSec = null;
+        let curCK = '';
         
         this.fields.forEach(field => {
-            const condKey = (field.showWhen && field.showWhen.fieldId && field.showWhen.value)
+            const ck = (field.showWhen && field.showWhen.fieldId && field.showWhen.value)
                 ? `${field.showWhen.fieldId}=${field.showWhen.value}`
                 : '';
             
-            if (fieldToPage.has(field.id)) {
-                // Already assigned — just update trackers
-                const pageId = fieldToPage.get(field.id);
-                lastAssignedPageId = pageId;
-                if (condKey) lastPagePerCondition.set(condKey, pageId);
+            if (!ck) {
+                curSec = null;
+                curCK = '';
                 return;
             }
             
-            // Orphan — determine target page
+            // New section when: label, different condition, or no current section
+            if (field.type === 'label' || ck !== curCK || curSec === null) {
+                sections.push({ condKey: ck, fieldIds: [] });
+                curSec = sections.length - 1;
+                curCK = ck;
+            }
+            sections[curSec].fieldIds.push(field.id);
+        });
+        
+        // For each section, determine target page and consolidate
+        let changeCount = 0;
+        sections.forEach(sec => {
             let targetPageId = null;
             
-            if (condKey && lastPagePerCondition.has(condKey)) {
-                // Same condition sibling's page (nearest in JSON order)
-                targetPageId = lastPagePerCondition.get(condKey);
-            } else if (field.showWhen && field.showWhen.fieldId && fieldToPage.has(field.showWhen.fieldId)) {
-                // Parent field's page (fallback when no sibling yet)
-                targetPageId = fieldToPage.get(field.showWhen.fieldId);
-            } else {
-                // Non-conditional orphan: last assigned page
-                targetPageId = lastAssignedPageId;
+            // Use first explicitly-assigned field's page
+            for (const fid of sec.fieldIds) {
+                if (fieldToPage.has(fid)) {
+                    targetPageId = fieldToPage.get(fid);
+                    break;
+                }
+            }
+            
+            // No explicit assignment → create virtual page
+            if (targetPageId === null) {
+                const newPageId = this.nextPageId++;
+                this.pages.push({ id: newPageId, name: `Sección ${newPageId}`, fieldIds: [] });
+                targetPageId = newPageId;
             }
             
             const targetPage = this.pages.find(p => p.id === targetPageId);
-            if (targetPage) {
-                if (!targetPage.fieldIds) targetPage.fieldIds = [];
-                targetPage.fieldIds.push(field.id);
-                fieldToPage.set(field.id, targetPageId);
-                orphanCount++;
-            }
+            if (!targetPage) return;
+            if (!targetPage.fieldIds) targetPage.fieldIds = [];
             
-            if (condKey) lastPagePerCondition.set(condKey, targetPageId);
+            sec.fieldIds.forEach(fid => {
+                const currentPageId = fieldToPage.get(fid);
+                if (currentPageId === targetPageId) return; // already correct
+                
+                if (currentPageId !== undefined) {
+                    // Remove from old page
+                    const oldPage = this.pages.find(p => p.id === currentPageId);
+                    if (oldPage && oldPage.fieldIds) {
+                        oldPage.fieldIds = oldPage.fieldIds.filter(id => id !== fid);
+                    }
+                }
+                
+                if (!targetPage.fieldIds.includes(fid)) {
+                    targetPage.fieldIds.push(fid);
+                }
+                fieldToPage.set(fid, targetPageId);
+                changeCount++;
+            });
         });
         
-        if (orphanCount > 0) {
-            console.log(`${orphanCount} campo(s) huérfano(s) asignado(s) por cercanía`);
+        // Handle non-conditional orphans
+        let lastPageId = this.pages[0].id;
+        this.fields.forEach(field => {
+            if (fieldToPage.has(field.id)) {
+                lastPageId = fieldToPage.get(field.id);
+                return;
+            }
+            const ck = (field.showWhen && field.showWhen.fieldId && field.showWhen.value)
+                ? `${field.showWhen.fieldId}=${field.showWhen.value}`
+                : '';
+            if (ck) return; // conditional fields already handled by sections
+            
+            const page = this.pages.find(p => p.id === lastPageId);
+            if (page) {
+                if (!page.fieldIds) page.fieldIds = [];
+                page.fieldIds.push(field.id);
+                fieldToPage.set(field.id, lastPageId);
+                changeCount++;
+            }
+        });
+        
+        if (changeCount > 0) {
+            console.log(`${changeCount} campo(s) reasignado(s) por secciones`);
         }
     }
 }

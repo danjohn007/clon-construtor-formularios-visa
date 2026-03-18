@@ -310,8 +310,50 @@ $contactInfo = [
                             }
                         }
                     }
-                    // Track last assigned page per showWhen condition for orphan placement
-                    $lastPagePerCondition = [];
+                    
+                    // Section-based page assignment for conditional fields
+                    $sectionPageMap = [];
+                    if (!empty($form['pagination_enabled']) && !empty($pages)) {
+                        $sections = [];
+                        $curSec = null;
+                        $curCK = '';
+                        
+                        foreach ($fields['fields'] as $f) {
+                            $ck = '';
+                            if (isset($f['showWhen']['fieldId']) && isset($f['showWhen']['value'])) {
+                                $ck = $f['showWhen']['fieldId'] . '=' . $f['showWhen']['value'];
+                            }
+                            if (!$ck) {
+                                $curSec = null;
+                                $curCK = '';
+                                continue;
+                            }
+                            if ($f['type'] === 'label' || $ck !== $curCK || $curSec === null) {
+                                $sections[] = ['condKey' => $ck, 'fieldIds' => []];
+                                $curSec = count($sections) - 1;
+                                $curCK = $ck;
+                            }
+                            $sections[$curSec]['fieldIds'][] = $f['id'];
+                        }
+                        
+                        $nextVirtualPage = empty($fieldPageMap) ? 2 : max(array_values($fieldPageMap)) + 1;
+                        foreach ($sections as $sec) {
+                            $target = null;
+                            foreach ($sec['fieldIds'] as $fid) {
+                                if (isset($fieldPageMap[$fid])) {
+                                    $target = $fieldPageMap[$fid];
+                                    break;
+                                }
+                            }
+                            if ($target === null) {
+                                $target = $nextVirtualPage++;
+                            }
+                            foreach ($sec['fieldIds'] as $fid) {
+                                $sectionPageMap[$fid] = $target;
+                            }
+                        }
+                    }
+                    
                     $lastAssignedPage = 1;
                     ?>
                     <?php foreach ($fields['fields'] as $field): ?>
@@ -327,31 +369,17 @@ $contactInfo = [
                             $conditionalStyle = 'style="display: none;"';
                         }
                         
-                        // Build condition key for sibling matching
-                        $condKey = '';
-                        if (isset($field['showWhen']['fieldId']) && isset($field['showWhen']['value'])) {
-                            $condKey = $field['showWhen']['fieldId'] . '=' . $field['showWhen']['value'];
-                        }
-                        
                         // Determine page assignment
                         $resolvedPage = '1';
                         if (!empty($form['pagination_enabled']) && !empty($pages)) {
-                            if (isset($fieldPageMap[$field['id']])) {
+                            if (isset($sectionPageMap[$field['id']])) {
+                                $resolvedPage = $sectionPageMap[$field['id']];
+                            } elseif (isset($fieldPageMap[$field['id']])) {
                                 $resolvedPage = $fieldPageMap[$field['id']];
-                                $lastAssignedPage = $resolvedPage;
-                            } elseif ($condKey && isset($lastPagePerCondition[$condKey])) {
-                                $resolvedPage = $lastPagePerCondition[$condKey];
-                            } elseif (
-                                isset($field['showWhen']['fieldId']) &&
-                                isset($fieldPageMap[$field['showWhen']['fieldId']])
-                            ) {
-                                $resolvedPage = $fieldPageMap[$field['showWhen']['fieldId']];
                             } else {
                                 $resolvedPage = $lastAssignedPage;
                             }
-                        }
-                        if ($condKey) {
-                            $lastPagePerCondition[$condKey] = $resolvedPage;
+                            $lastAssignedPage = $resolvedPage;
                         }
                     ?>
                     <div class="form-field" data-field-id="<?= htmlspecialchars($field['id']) ?>" data-field-label="<?= htmlspecialchars($field['label'] ?? $field['id']) ?>" <?= $showWhenAttr ?> <?= $conditionalStyle ?> data-page="<?= $resolvedPage ?>">
