@@ -299,9 +299,16 @@ class FormBuilder {
         
         this.fields.push(newField);
         
-        // If pagination is enabled, add field to current page
-        if (this.paginationEnabled && this.currentPage) {
-            const page = this.pages.find(p => p.id === this.currentPage);
+        // If pagination is enabled, add field to a page
+        if (this.paginationEnabled) {
+            let page = null;
+            if (this.currentPage) {
+                page = this.pages.find(p => p.id === this.currentPage);
+            }
+            // Fallback to last page if viewing all (currentPage === 0)
+            if (!page && this.pages.length > 0) {
+                page = this.pages[this.pages.length - 1];
+            }
             if (page) {
                 page.fieldIds.push(newField.id);
             }
@@ -558,6 +565,11 @@ class FormBuilder {
         const hiddenField = document.getElementById('fields_json_hidden');
         if (hiddenField) {
             hiddenField.value = JSON.stringify(jsonOutput);
+        }
+        
+        // Ensure all fields are assigned to a page before saving
+        if (this.paginationEnabled) {
+            this.ensureAllFieldsAssigned();
         }
         
         // Also save pages JSON to a separate hidden field
@@ -835,30 +847,61 @@ class FormBuilder {
      * Los campos huérfanos se asignan a la primera página
      */
     ensureAllFieldsAssigned() {
-        if (!this.paginationEnabled) return;
+        if (!this.paginationEnabled || this.pages.length === 0) return;
         
-        // Obtener todos los IDs de campos asignados a páginas
-        const assignedFieldIds = new Set();
+        // Build lookup: fieldId → pageId for assigned fields
+        const fieldToPage = new Map();
         this.pages.forEach(page => {
             if (page.fieldIds && Array.isArray(page.fieldIds)) {
-                page.fieldIds.forEach(id => assignedFieldIds.add(id));
+                page.fieldIds.forEach(id => fieldToPage.set(id, page.id));
             }
         });
         
-        // Encontrar campos huérfanos (no asignados a ninguna página)
-        const orphanFields = this.fields.filter(field => !assignedFieldIds.has(field.id));
+        // Track last page per condition for sibling-aware assignment
+        const lastPagePerCondition = new Map();
+        let lastAssignedPageId = this.pages[0].id;
+        let orphanCount = 0;
         
-        if (orphanFields.length > 0) {
-            // Asignar campos huérfanos a la primera página
-            if (this.pages.length > 0) {
-                if (!this.pages[0].fieldIds) {
-                    this.pages[0].fieldIds = [];
-                }
-                orphanFields.forEach(field => {
-                    this.pages[0].fieldIds.push(field.id);
-                });
-                console.log(`${orphanFields.length} campo(s) huérfano(s) asignado(s) a la primera página`);
+        this.fields.forEach(field => {
+            const condKey = (field.showWhen && field.showWhen.fieldId && field.showWhen.value)
+                ? `${field.showWhen.fieldId}=${field.showWhen.value}`
+                : '';
+            
+            if (fieldToPage.has(field.id)) {
+                // Already assigned — just update trackers
+                const pageId = fieldToPage.get(field.id);
+                lastAssignedPageId = pageId;
+                if (condKey) lastPagePerCondition.set(condKey, pageId);
+                return;
             }
+            
+            // Orphan — determine target page
+            let targetPageId = null;
+            
+            if (condKey && lastPagePerCondition.has(condKey)) {
+                // Same condition sibling's page (nearest in JSON order)
+                targetPageId = lastPagePerCondition.get(condKey);
+            } else if (field.showWhen && field.showWhen.fieldId && fieldToPage.has(field.showWhen.fieldId)) {
+                // Parent field's page (fallback when no sibling yet)
+                targetPageId = fieldToPage.get(field.showWhen.fieldId);
+            } else {
+                // Non-conditional orphan: last assigned page
+                targetPageId = lastAssignedPageId;
+            }
+            
+            const targetPage = this.pages.find(p => p.id === targetPageId);
+            if (targetPage) {
+                if (!targetPage.fieldIds) targetPage.fieldIds = [];
+                targetPage.fieldIds.push(field.id);
+                fieldToPage.set(field.id, targetPageId);
+                orphanCount++;
+            }
+            
+            if (condKey) lastPagePerCondition.set(condKey, targetPageId);
+        });
+        
+        if (orphanCount > 0) {
+            console.log(`${orphanCount} campo(s) huérfano(s) asignado(s) por cercanía`);
         }
     }
 }

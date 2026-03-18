@@ -300,6 +300,20 @@ $contactInfo = [
                     <input type="hidden" id="submission-id" value="">
                     <input type="hidden" id="current-page" value="1">
                     
+                    <?php
+                    // Pre-build lookup: fieldId → page id
+                    $fieldPageMap = [];
+                    if (!empty($form['pagination_enabled']) && !empty($pages)) {
+                        foreach ($pages as $page) {
+                            foreach ($page['fieldIds'] ?? [] as $fid) {
+                                $fieldPageMap[$fid] = $page['id'];
+                            }
+                        }
+                    }
+                    // Track last assigned page per showWhen condition for orphan placement
+                    $lastPagePerCondition = [];
+                    $lastAssignedPage = 1;
+                    ?>
                     <?php foreach ($fields['fields'] as $field): ?>
                     <?php
                         // Preparar atributos para campos condicionales
@@ -310,28 +324,37 @@ $contactInfo = [
                                 'data-show-when=\'%s\'',
                                 htmlspecialchars(json_encode($field['showWhen']), ENT_QUOTES, 'UTF-8')
                             );
-                            // Ocultar por defecto los campos condicionales
                             $conditionalStyle = 'style="display: none;"';
                         }
-                    ?>
-                    <div class="form-field" data-field-id="<?= htmlspecialchars($field['id']) ?>" data-field-label="<?= htmlspecialchars($field['label'] ?? $field['id']) ?>" <?= $showWhenAttr ?> <?= $conditionalStyle ?> data-page="<?php
-                        // Find which page this field belongs to
-                        $pageAssigned = false;
-                        if (!empty($form['pagination_enabled']) && !empty($pages)) {
-                            foreach ($pages as $page) {
-                                if (in_array($field['id'], $page['fieldIds'])) {
-                                    echo $page['id'];
-                                    $pageAssigned = true;
-                                    break;
-                                }
-                            }
-                            if (!$pageAssigned) {
-                                echo '1';
-                            }
-                        } else {
-                            echo '1';
+                        
+                        // Build condition key for sibling matching
+                        $condKey = '';
+                        if (isset($field['showWhen']['fieldId']) && isset($field['showWhen']['value'])) {
+                            $condKey = $field['showWhen']['fieldId'] . '=' . $field['showWhen']['value'];
                         }
-                    ?>">
+                        
+                        // Determine page assignment
+                        $resolvedPage = '1';
+                        if (!empty($form['pagination_enabled']) && !empty($pages)) {
+                            if (isset($fieldPageMap[$field['id']])) {
+                                $resolvedPage = $fieldPageMap[$field['id']];
+                                $lastAssignedPage = $resolvedPage;
+                            } elseif ($condKey && isset($lastPagePerCondition[$condKey])) {
+                                $resolvedPage = $lastPagePerCondition[$condKey];
+                            } elseif (
+                                isset($field['showWhen']['fieldId']) &&
+                                isset($fieldPageMap[$field['showWhen']['fieldId']])
+                            ) {
+                                $resolvedPage = $fieldPageMap[$field['showWhen']['fieldId']];
+                            } else {
+                                $resolvedPage = $lastAssignedPage;
+                            }
+                        }
+                        if ($condKey) {
+                            $lastPagePerCondition[$condKey] = $resolvedPage;
+                        }
+                    ?>
+                    <div class="form-field" data-field-id="<?= htmlspecialchars($field['id']) ?>" data-field-label="<?= htmlspecialchars($field['label'] ?? $field['id']) ?>" <?= $showWhenAttr ?> <?= $conditionalStyle ?> data-page="<?= $resolvedPage ?>">
                         <?php if ($field['type'] === 'label'): ?>
                             <!-- Encabezado/Separador de sección -->
                             <h3 class="text-base font-bold text-gray-900 mb-3 pb-2 border-b border-gray-300 flex items-center uppercase tracking-wide">
@@ -499,6 +522,11 @@ $contactInfo = [
         const conditionalManager = {
             fields: [],
             
+            // Normalizar valor para comparación tolerante
+            normalize(val) {
+                return (val || '').toString().trim().toLowerCase();
+            },
+            
             init() {
                 console.log('🔗 Inicializando ConditionalFieldsManager...');
                 const els = document.querySelectorAll('[data-show-when]');
@@ -525,23 +553,33 @@ $contactInfo = [
                     f.element.classList.add('conditional-hidden');
                 });
                 
-                // Listeners en campos padre
+                // Listeners en campos padre (radio, select, otros inputs)
                 const parentIds = [...new Set(this.fields.map(f => f.parentFieldId))];
                 console.log('🎯 Campos padre:', parentIds);
                 parentIds.forEach(pid => {
-                    document.querySelectorAll(`input[name="${pid}"]`).forEach(radio => {
-                        radio.addEventListener('change', () => {
-                            console.log(`🔄 Cambio: "${pid}" → "${radio.value}"`);
-                            // Limpiar valores de campos que se van a ocultar
-                            this.fields.filter(f => f.parentFieldId === pid).forEach(f => {
-                                if (radio.value !== f.requiredValue) {
-                                    this.clearFieldValues(f.element);
-                                }
-                            });
-                            // Recalcular páginas visibles y refrescar vista actual
-                            recalculateVisiblePages();
-                            showPage(currentPage);
+                    const handler = (e) => {
+                        const newVal = this.getFieldValue(pid);
+                        console.log(`🔄 Cambio: "${pid}" → "${newVal}"`);
+                        // Limpiar campos cuya condición ya no se cumple
+                        this.fields.filter(f => f.parentFieldId === pid).forEach(f => {
+                            if (this.normalize(newVal) !== this.normalize(f.requiredValue)) {
+                                this.clearFieldValues(f.element);
+                            }
                         });
+                        recalculateVisiblePages();
+                        showPage(currentPage);
+                    };
+                    // Radio buttons e inputs con ese name
+                    document.querySelectorAll(`input[name="${pid}"]`).forEach(el => {
+                        el.addEventListener('change', handler);
+                    });
+                    // Select elements con ese name
+                    document.querySelectorAll(`select[name="${pid}"]`).forEach(el => {
+                        el.addEventListener('change', handler);
+                    });
+                    // Textarea con ese name
+                    document.querySelectorAll(`textarea[name="${pid}"]`).forEach(el => {
+                        el.addEventListener('input', handler);
                     });
                 });
             },
@@ -550,20 +588,26 @@ $contactInfo = [
                 if (!fieldDiv.hasAttribute('data-show-when')) return true;
                 try {
                     const sw = JSON.parse(fieldDiv.getAttribute('data-show-when'));
-                    return this.getFieldValue(sw.fieldId) === sw.value;
+                    const actual = this.getFieldValue(sw.fieldId);
+                    return this.normalize(actual) === this.normalize(sw.value);
                 } catch(e) { return false; }
             },
             
             getFieldValue(fieldId) {
+                // Radio buttons
                 const radio = document.querySelector(`input[name="${fieldId}"]:checked`);
                 if (radio) return radio.value;
+                // Select elements
+                const sel = document.querySelector(`select[name="${fieldId}"]`);
+                if (sel) return sel.value;
+                // Other inputs (text, checkbox, etc.)
                 const input = document.getElementById(`field_${fieldId}`);
                 if (input) return input.type === 'checkbox' ? (input.checked ? 'true' : 'false') : input.value;
                 return null;
             },
             
             clearFieldValues(container) {
-                container.querySelectorAll('input:not([type="hidden"]), textarea').forEach(input => {
+                container.querySelectorAll('input:not([type="hidden"]), textarea, select').forEach(input => {
                     if (input.type === 'checkbox' || input.type === 'radio') input.checked = false;
                     else input.value = '';
                     input.classList.remove('border-red-500');
@@ -671,7 +715,7 @@ $contactInfo = [
             document.querySelectorAll(`[data-page="${currentPage}"]`).forEach(fieldDiv => {
                 if (fieldDiv.style.display === 'none') return;
                 
-                fieldDiv.querySelectorAll('input:not([type="hidden"]), textarea').forEach(input => {
+                fieldDiv.querySelectorAll('input:not([type="hidden"]), textarea, select').forEach(input => {
                     input.classList.remove('border-red-500');
                     
                     if (input.hasAttribute('required')) {
