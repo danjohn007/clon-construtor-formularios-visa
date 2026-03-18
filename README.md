@@ -4,6 +4,19 @@ Sistema reutilizable de construcción y gestión de formularios dinámicos con i
 
 Diseñado para integrarse con **cualquier sitio web** que necesite un formulario dinámico embebido.
 
+> ### 📌 Dos vías de integración independientes
+>
+> El sistema ofrece **dos formas de usar un formulario**, ambas escriben a la misma tabla `applications` sin conflicto:
+>
+> | | Iframe embebible | Sitio principal (cURL) |
+> |---|---|---|
+> | **URL** | `/public/form/{id}?embed=1` | `get-published-form.php` API |
+> | **Controlador** | `PublicFormController::submit()` | `send_quote.php` del sitio externo |
+> | **Identifica form por** | `form_id` del URL | El único con `is_published = 1` |
+> | **Independencia** | Cualquier formulario, sin importar si está "publicado" | Solo el formulario publicado |
+>
+> Cada submission genera su propio folio (`FORM-YYYY-NNNNNN`) y se inserta como registro independiente. **No se pisan ni se sobrescriben entre sí.** Puedes tener múltiples formularios recibiendo datos por iframe al mismo tiempo que el sitio principal recibe por su lado — todo diferenciado por `form_id`.
+
 ## 🚀 Características Principales
 
 ### ✨ Constructor de Formularios
