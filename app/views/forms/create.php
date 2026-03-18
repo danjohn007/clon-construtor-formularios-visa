@@ -47,11 +47,11 @@ ob_start();
                             Divide el formulario en secciones para guardar el avance
                         </p>
                     </div>
-                    <input type="checkbox" name="pagination_enabled" id="pagination_enabled" value="1"
+                    <input type="checkbox" name="pagination_enabled" id="pagination_enabled" value="1" checked
                            class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500">
                 </div>
                 
-                <div id="pagination-config" style="display: none;" class="bg-gray-50 rounded-lg p-4 mt-3">
+                <div id="pagination-config" class="bg-gray-50 rounded-lg p-4 mt-3">
                     <p class="text-sm text-gray-600 mb-3">
                         <i class="fas fa-layer-group mr-1"></i> 
                         Al habilitar paginación, podrás dividir tus campos en secciones. 
