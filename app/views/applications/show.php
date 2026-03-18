@@ -213,15 +213,27 @@ $statusClass = $statusColors[$status] ?? 'bg-gray-100 text-gray-800';
             </h3>
             <div class="space-y-3">
                 <?php foreach ($attachments as $att): ?>
-                <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                <?php
+                    $ext = strtolower($att['type'] ?? '');
+                    $aIcon = 'fa-file'; $aColor = 'text-gray-600';
+                    if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif'])) { $aIcon = 'fa-file-image'; $aColor = 'text-blue-600'; }
+                    elseif ($ext === 'pdf') { $aIcon = 'fa-file-pdf'; $aColor = 'text-red-600'; }
+                    elseif (in_array($ext, ['doc', 'docx'])) { $aIcon = 'fa-file-word'; $aColor = 'text-blue-700'; }
+                    
+                    // Match attachment to document record by filename
+                    $matchedDoc = null;
+                    if (!empty($documents)) {
+                        foreach ($documents as $doc) {
+                            if (str_contains($doc['name'] ?? '', $att['filename'] ?? '__none__')) {
+                                $matchedDoc = $doc;
+                                break;
+                            }
+                        }
+                    }
+                    $isPreviewable = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'pdf']);
+                ?>
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
                     <div class="flex items-center space-x-3">
-                        <?php
-                        $ext = strtolower($att['type'] ?? '');
-                        $aIcon = 'fa-file'; $aColor = 'text-gray-600';
-                        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif'])) { $aIcon = 'fa-file-image'; $aColor = 'text-blue-600'; }
-                        elseif ($ext === 'pdf') { $aIcon = 'fa-file-pdf'; $aColor = 'text-red-600'; }
-                        elseif (in_array($ext, ['doc', 'docx'])) { $aIcon = 'fa-file-word'; $aColor = 'text-blue-700'; }
-                        ?>
                         <i class="fas <?= $aIcon ?> <?= $aColor ?> text-2xl"></i>
                         <div>
                             <p class="font-medium text-gray-800"><?= htmlspecialchars($att['filename'] ?? 'Archivo') ?></p>
@@ -231,6 +243,23 @@ $statusClass = $statusColors[$status] ?? 'bg-gray-100 text-gray-800';
                             </p>
                         </div>
                     </div>
+                    <?php if ($matchedDoc): ?>
+                    <div class="flex items-center space-x-2">
+                        <?php if ($isPreviewable): ?>
+                        <a href="<?= BASE_URL ?><?= htmlspecialchars($matchedDoc['file_path']) ?>" 
+                           target="_blank"
+                           class="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition text-sm"
+                           title="Ver archivo">
+                            <i class="fas fa-eye mr-1"></i>Ver
+                        </a>
+                        <?php endif; ?>
+                        <a href="<?= BASE_URL ?>/solicitudes/descargar-documento/<?= $matchedDoc['id'] ?>"
+                           class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition text-sm"
+                           title="Descargar archivo">
+                            <i class="fas fa-download mr-1"></i>Descargar
+                        </a>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
             </div>
