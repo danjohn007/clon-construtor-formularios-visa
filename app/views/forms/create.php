@@ -82,6 +82,81 @@ ob_start();
                     <i class="fas fa-info-circle"></i> Arrastra y suelta campos para construir tu formulario
                 </p>
             </div>
+            
+            <!-- Consideraciones -->
+            <div class="md:col-span-2 border-t pt-6">
+                <details class="bg-amber-50 border border-amber-200 rounded-lg">
+                    <summary class="px-4 py-3 cursor-pointer text-sm font-semibold text-amber-800 flex items-center hover:bg-amber-100 rounded-lg transition">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        Consideraciones importantes al construir el formulario
+                    </summary>
+                    <div class="px-4 pb-4 space-y-3 text-sm text-gray-700">
+                        
+                        <div class="flex items-start gap-2 bg-white rounded p-3 border border-amber-100">
+                            <i class="fas fa-heading text-blue-500 mt-0.5 flex-shrink-0"></i>
+                            <div>
+                                <strong class="text-gray-900">Encabezado = Separador de sección</strong>
+                                <p class="text-xs text-gray-600 mt-1">
+                                    Los campos tipo <strong>"Encabezado"</strong> actúan como separadores de sección. 
+                                    Cuando usas paginación con campos condicionales, todos los campos que estén 
+                                    debajo de un encabezado (con la misma condición) se agruparán automáticamente 
+                                    en la misma página. <em>Cada nuevo encabezado inicia una sección distinta.</em>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start gap-2 bg-white rounded p-3 border border-amber-100">
+                            <i class="fas fa-link text-purple-500 mt-0.5 flex-shrink-0"></i>
+                            <div>
+                                <strong class="text-gray-900">Campos condicionales (showWhen)</strong>
+                                <p class="text-xs text-gray-600 mt-1">
+                                    Un campo condicional solo se muestra cuando otro campo de tipo <strong>"Selección"</strong> 
+                                    tiene un valor específico. Por ejemplo: mostrar campos de "Landscaping" solo 
+                                    cuando el usuario seleccione "Landscaping" en el campo de servicio. 
+                                    Usa el botón <i class="fas fa-link text-blue-500"></i> de cada campo para configurarlo.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start gap-2 bg-white rounded p-3 border border-amber-100">
+                            <i class="fas fa-layer-group text-green-500 mt-0.5 flex-shrink-0"></i>
+                            <div>
+                                <strong class="text-gray-900">Paginación y agrupación automática</strong>
+                                <p class="text-xs text-gray-600 mt-1">
+                                    Al habilitar paginación, los campos condicionales de una misma sección 
+                                    (entre dos encabezados) se consolidarán automáticamente en una sola página, 
+                                    sin importar en qué página estén asignados manualmente. 
+                                    Esto evita que un grupo de campos quede disperso en múltiples páginas.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start gap-2 bg-white rounded p-3 border border-amber-100">
+                            <i class="fas fa-list text-orange-500 mt-0.5 flex-shrink-0"></i>
+                            <div>
+                                <strong class="text-gray-900">Campo "Selección" se renderiza como radio buttons</strong>
+                                <p class="text-xs text-gray-600 mt-1">
+                                    Los campos de tipo <strong>"Selección"</strong> se muestran como botones de radio 
+                                    en el formulario público (no como dropdown). Separa las opciones con comas.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start gap-2 bg-white rounded p-3 border border-amber-100">
+                            <i class="fas fa-sort-amount-down text-red-500 mt-0.5 flex-shrink-0"></i>
+                            <div>
+                                <strong class="text-gray-900">El orden de los campos importa</strong>
+                                <p class="text-xs text-gray-600 mt-1">
+                                    El orden en que aparecen los campos en el constructor es el orden en que se 
+                                    renderizan en el formulario público. Coloca los encabezados <strong>antes</strong> 
+                                    de los campos que pertenecen a esa sección.
+                                </p>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </details>
+            </div>
         </div>
         
         <div class="mt-6 flex justify-end space-x-4">
