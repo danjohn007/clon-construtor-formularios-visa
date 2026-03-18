@@ -14,9 +14,9 @@ define('ROOT_PATH', dirname(__DIR__));
 
 // Configuración de Base de Datos
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'landscap_testing');
-define('DB_USER', 'landscap_forms_constructor');
-define('DB_PASS', 'Fiev^QKFzSIc');
+define('DB_NAME', 'some_db');
+define('DB_USER', 'some_user');
+define('DB_PASS', 'some_password');
 define('DB_CHARSET', 'utf8mb4');
 
 // Configuración de Timezone
