@@ -1,342 +1,263 @@
-# CRM de Solicitudes de Visas y Pasaportes
+# Constructor de Formularios Dinámicos
 
-Sistema completo de gestión de trámites de Visas y Pasaportes con constructor de formularios dinámicos, control de roles y módulo financiero.
+Sistema reutilizable de construcción y gestión de formularios dinámicos con interfaz visual drag & drop, lógica condicional entre campos, paginación, gestión de solicitudes, roles y módulo financiero.
+
+Diseñado para integrarse con **cualquier sitio web** que necesite un formulario dinámico embebido.
 
 ## 🚀 Características Principales
 
-### ✨ Constructor de Formularios Dinámicos
-- Interfaz visual tipo JotForm
-- Múltiples tipos de campos (texto, fecha, archivo, select, etc.)
-- Lógica condicional entre campos
+### ✨ Constructor de Formularios
+- Interfaz visual drag & drop (tipo JotForm)
+- Múltiples tipos de campos: texto, email, teléfono, número, fecha, selección (radio buttons), casilla, área de texto, archivo, encabezado
+- **Lógica condicional (showWhen)**: muestra/oculta campos según el valor de un campo de selección
+- **Paginación**: divide el formulario en secciones navegables
+- **Agrupación automática por secciones**: los encabezados actúan como separadores — todos los campos condicionales entre dos encabezados se consolidan en la misma página
 - Versionado automático de formularios
 - Publicar/Despublicar formularios
+
+### 📋 Gestión de Solicitudes
+- Folios únicos automáticos (FORM-YYYY-NNNNNN)
+- Seguimiento completo por estatus
+- Historial detallado de cambios
+- Archivos adjuntos con visualización y descarga
+- Notas e indicaciones por solicitud
 
 ### 👥 Sistema de Roles y Permisos
 - **Administrador**: Control total del sistema
 - **Gerente**: Gestión operativa y financiera
 - **Asesor**: Captura de nuevas solicitudes (sin acceso a finalizadas)
 
-### 📋 Gestión de Solicitudes
-- Folios únicos automáticos (VISA-YYYY-NNNNNN)
-- Seguimiento completo por estatus
-- Historial detallado de cambios
-- Sistema de documentos con versionado
-- **Regla crítica**: Asesores no ven solicitudes finalizadas
-
 ### 💰 Módulo Financiero
 - Registro de costos por solicitud
 - Control de pagos múltiples
 - Estados financieros (Pendiente, Parcial, Pagado)
-- Acceso exclusivo para Admin y Gerente
 
-### 📊 Reportes y Dashboard
+### 📊 Dashboard y Reportes
 - Estadísticas en tiempo real
-- Gráficas interactivas
 - Exportación a Excel, CSV, PDF
-- Dashboard personalizado por rol
 
-### ⚙️ Configuración Global
-- Personalización de sitio (nombre, logo)
-- Configuración de correo electrónico
-- Gestión de contactos y horarios
-- Temas de color personalizables
-- Integración con PayPal
-- API para generación de QR
-
-### 🔌 Integraciones
-- Dispositivos HikVision
-- Shelly Cloud
-- Registro y visualización de logs de errores
+---
 
 ## 📋 Requisitos del Sistema
 
 - **PHP**: 7.4 o superior
 - **MySQL**: 5.7 o superior
 - **Servidor Web**: Apache con mod_rewrite
-- **Extensiones PHP requeridas**:
-  - PDO
-  - pdo_mysql
-  - json
-  - mbstring
-  - openssl
+- **cPanel** (recomendado) o cualquier hosting con PHP + MySQL
+- **Extensiones PHP**: PDO, pdo_mysql, json, mbstring, openssl, curl
 
-## 🛠️ Instalación
+---
 
-### 1. Clonar o Descargar el Repositorio
+## 🛠️ Instalación y Despliegue
 
-```bash
-git clone https://github.com/danjohn007/CRMIntranet.git
-cd CRMIntranet
+### Estructura esperada en el servidor
+
+```
+public_html/                    ← Raíz del dominio (sitio principal)
+├── index.php                   ← Tu sitio web
+├── contact.php                 ← Página que embebe el formulario
+├── includes/
+│   └── dynamic_form.php        ← Renderizador del formulario embebido
+├── send_quote.php              ← Procesador de submissions
+└── sistema/                    ← Constructor de formularios (este proyecto)
+    ├── public/
+    │   ├── index.php           ← Punto de entrada del constructor
+    │   ├── api/
+    │   │   └── get-published-form.php  ← API que sirve el formulario
+    │   ├── js/
+    │   │   └── form-builder.js
+    │   └── uploads/
+    ├── app/
+    │   ├── controllers/
+    │   ├── views/
+    │   └── ...
+    └── config/
+        ├── config.php          ← Credenciales BD y configuración
+        └── database.php        ← Conexión PDO
 ```
 
-### 2. Configurar el Servidor Web
+> **Importante**: El constructor vive en `/sistema/` dentro de la raíz del dominio. El sitio que consume el formulario vive en la raíz (`/public_html/`).
 
-#### Apache (usando XAMPP, WAMP, LAMP, etc.)
+### Paso 1: Subir el constructor
 
-Copie el proyecto a la carpeta del servidor:
-- **XAMPP**: `C:\xampp\htdocs\CRMIntranet`
-- **WAMP**: `C:\wamp\www\CRMIntranet`
-- **Linux**: `/var/www/html/CRMIntranet`
+1. Sube la carpeta completa del proyecto a `/public_html/sistema/`
+2. El punto de entrada del constructor será: `https://tudominio.com/sistema/public/`
 
-El sistema está diseñado para funcionar en cualquier directorio gracias a la detección automática de URL base.
+### Paso 2: Configurar la Base de Datos
 
-### 3. Configurar la Base de Datos
-
-1. Acceda a phpMyAdmin o su gestor de MySQL
-2. Ejecute el archivo `database/schema.sql` completo
-3. Este archivo creará:
-   - Base de datos `crm_visas`
-   - Todas las tablas necesarias
-   - Datos de ejemplo del estado de Querétaro
-   - Usuarios de prueba
-
-### 4. Configurar Credenciales de Base de Datos
-
-Edite el archivo `/config/config.php` (líneas 15-18):
+1. Crea una base de datos MySQL desde cPanel
+2. Importa `database/schema.sql`
+3. Edita `/sistema/config/config.php`:
 
 ```php
-define('DB_HOST', 'localhost');      // Host de MySQL
-define('DB_NAME', 'crm_visas');      // Nombre de la base de datos
-define('DB_USER', 'root');           // Usuario de MySQL
-define('DB_PASS', '');               // Contraseña de MySQL
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'tu_base_de_datos');
+define('DB_USER', 'tu_usuario');
+define('DB_PASS', 'tu_contraseña');
 ```
 
-### 5. Configurar Permisos
-
-Asegúrese de que el directorio `public/uploads` tenga permisos de escritura:
+### Paso 3: Permisos
 
 ```bash
-chmod -R 755 public/uploads
+chmod -R 755 sistema/public/uploads
 ```
 
-En Windows, generalmente no es necesario configurar permisos adicionales.
-
-### 6. Probar la Instalación
-
-#### Test Rápido de Conexión
-Acceda al archivo de prueba rápida en la raíz:
-```
-http://localhost/CRMIntranet/test_connection.php
-```
-
-Este archivo verificará:
-- ✅ Conexión a la base de datos
-- ✅ Versión de MySQL
-- ✅ Tablas existentes
-- ✅ Usuarios registrados
-- ✅ Configuración de PHP y PDO
-
-#### Test Completo del Sistema
-Para una verificación más completa:
-```
-http://localhost/CRMIntranet/test-conexion
-```
-
-Esta página verificará:
-- ✅ URL base configurada correctamente
-- ✅ Conexión a la base de datos
-- ✅ Existencia de tablas
-- ✅ Permisos de escritura
-- ✅ Extensiones PHP requeridas
-
-### 7. Acceder al Sistema
+### Paso 4: Acceder al constructor
 
 ```
-http://localhost/CRMIntranet/
+https://tudominio.com/sistema/
 ```
 
-## 👤 Usuarios de Prueba
+---
 
-El sistema incluye los siguientes usuarios de ejemplo:
+## 🔌 Cómo embeber el formulario en tu sitio
 
-| Usuario | Contraseña | Rol | Email |
-|---------|-----------|-----|-------|
-| admin | password123 | Administrador | admin@crmvisas.com |
-| gerente01 | password123 | Gerente | gerente@crmvisas.com |
-| asesor01 | password123 | Asesor | asesor1@crmvisas.com |
-| asesor02 | password123 | Asesor | asesor2@crmvisas.com |
+El constructor expone una **API REST** que tu sitio consume para obtener la definición del formulario publicado.
+
+### Mecanismo de integración
+
+```
+Tu sitio (raíz)                         Constructor (/sistema/)
+─────────────────                       ─────────────────────────
+contact.php                              
+  └─ includes/dynamic_form.php          
+       │                                
+       ├── [GET] cURL ──────────────►  /sistema/public/api/get-published-form.php
+       │       ◄──── JSON ──────────   (devuelve campos, páginas, paginación)
+       │                                
+       └── Renderiza HTML/JS            
+           del formulario               
+                                        
+Usuario llena y envía                   
+  └─ fetch('send_quote.php') ──►  send_quote.php
+       │                            ├── Guarda en BD (misma del constructor)
+       │                            ├── Envía email de confirmación
+       │                            └── Retorna { success, folio }
+```
+
+### Qué cambiar en `dynamic_form.php` (tu sitio)
+
+La URL de la API está en la línea ~12. Cámbiala a tu dominio:
+
+```php
+// ANTES (hardcodeado)
+$apiUrl = 'https://landscapeinaustin.com/sistema/public/api/get-published-form.php';
+
+// DESPUÉS (tu dominio)
+$apiUrl = 'https://tudominio.com/sistema/public/api/get-published-form.php';
+```
+
+### Qué cambiar en `send_quote.php` (tu sitio)
+
+Este archivo carga la configuración del constructor para guardar en la misma BD:
+
+```php
+// Línea ~17-18: Ruta al config del constructor
+$configPath = __DIR__ . '/sistema/config/config.php';
+$databasePath = __DIR__ . '/sistema/config/database.php';
+```
+
+> Si tu constructor está en otra ruta, ajusta estas líneas.
+
+### Archivos necesarios en tu sitio (raíz)
+
+| Archivo | Propósito |
+|---------|-----------|
+| `includes/dynamic_form.php` | Renderiza el formulario dinámico (cURL + HTML/JS) |
+| `send_quote.php` | Procesa el envío: guarda en BD + envía email |
+
+Estos dos archivos son los únicos que conectan tu sitio con el constructor.
+
+---
+
+## ⚠️ Consideraciones para el Constructor de Formularios
+
+### Encabezado = Separador de sección
+Los campos tipo **"Encabezado"** actúan como separadores de sección. Con paginación y campos condicionales, todos los campos debajo de un encabezado (con la misma condición `showWhen`) se agrupan automáticamente en la misma página. Cada nuevo encabezado inicia una sección distinta.
+
+### Campos condicionales (showWhen)
+Un campo condicional solo se muestra cuando otro campo de tipo "Selección" tiene un valor específico. Se configura con el botón de enlace (🔗) en cada campo.
+
+### Paginación y agrupación automática
+Al habilitar paginación, los campos condicionales de una misma sección se consolidan en una sola página, sin importar la asignación manual en `pages_json`. Esto evita que un grupo de campos quede disperso.
+
+### Campo "Selección" se renderiza como radio buttons
+En el formulario público, los campos de selección se muestran como radio buttons, no como dropdown.
+
+### El orden importa
+Los encabezados deben ir **antes** de los campos que pertenecen a su sección.
+
+---
+
+## 🎨 Tecnologías
+
+- **Backend**: PHP puro (MVC, sin frameworks)
+- **Base de Datos**: MySQL 5.7+
+- **Frontend**: HTML5, Tailwind CSS, JavaScript vanilla
+- **Iconos**: Font Awesome 6
+- **Gráficas**: Chart.js
 
 ## 📁 Estructura del Proyecto
 
 ```
-CRMIntranet/
+constructor-formularios/
 ├── app/
-│   ├── controllers/      # Controladores MVC
-│   ├── models/           # Modelos de datos
-│   └── views/            # Vistas HTML/PHP
+│   ├── controllers/        # Router, FormController, PublicFormController, etc.
+│   └── views/
+│       ├── forms/           # create.php, edit.php (constructor visual)
+│       ├── applications/    # show.php (ver solicitudes)
+│       ├── public/          # form.php (preview del formulario)
+│       └── layouts/         # main.php (layout base)
 ├── config/
-│   ├── config.php        # Configuración general
-│   └── database.php      # Conexión a BD
+│   ├── config.php           # BD, URL base, timezone
+│   └── database.php         # Conexión PDO
 ├── database/
-│   └── schema.sql        # Estructura de BD con datos de ejemplo
+│   └── schema.sql           # Estructura completa
 ├── public/
-│   ├── css/              # Estilos personalizados
-│   ├── js/               # JavaScript
-│   ├── uploads/          # Archivos subidos
-│   └── index.php         # Punto de entrada
-├── .htaccess             # Configuración Apache
-├── test_connection.php   # Test rápido de conexión DB
-└── README.md             # Este archivo
-```
-│   ├── uploads/          # Archivos subidos
-│   └── index.php         # Punto de entrada
-├── .htaccess             # Configuración Apache
-└── README.md             # Este archivo
+│   ├── index.php            # Entry point
+│   ├── api/
+│   │   └── get-published-form.php  # API REST del formulario
+│   ├── js/
+│   │   └── form-builder.js  # Constructor visual drag & drop
+│   └── uploads/             # Archivos subidos por usuarios
+└── README.md
 ```
 
 ## 🔒 Seguridad
 
-### Medidas Implementadas
+- Autenticación con `password_hash()` / `password_verify()`
+- Sesiones seguras (HTTPOnly cookies)
+- PDO Prepared Statements (protección SQL injection)
+- Sanitización de entradas
+- Validación de permisos por rol en cada endpoint
+- Protección contra listado de directorios
 
-- ✅ Autenticación con `password_hash()` y `password_verify()`
-- ✅ Sesiones seguras con cookies HTTPOnly
-- ✅ Validación de permisos en cada endpoint
-- ✅ Preparación de consultas SQL (PDO Prepared Statements)
-- ✅ Sanitización de entradas de usuario
-- ✅ Protección contra listado de directorios
-- ✅ Logs de errores separados de la aplicación
+## 👤 Usuarios por Defecto
 
-### Regla Crítica de Seguridad
+| Usuario | Contraseña | Rol |
+|---------|-----------|-----|
+| admin | password123 | Administrador |
+| gerente01 | password123 | Gerente |
+| asesor01 | password123 | Asesor |
 
-**Los Asesores NO pueden ver solicitudes con estatus "Finalizado"**
-
-Esta regla está implementada a nivel de:
-- Base de datos (queries filtrados)
-- Controladores (validación de permisos)
-- Vistas (ocultar información)
-
-## 🎨 Tecnologías Utilizadas
-
-- **Backend**: PHP puro (sin frameworks)
-- **Base de Datos**: MySQL 5.7
-- **Frontend**: 
-  - HTML5 + CSS3
-  - Tailwind CSS (diseño responsivo)
-  - JavaScript vanilla
-- **Gráficas**: Chart.js / ApexCharts
-- **Iconos**: Font Awesome 6
-- **Calendario**: FullCalendar.js
-- **Arquitectura**: MVC (Model-View-Controller)
-
-## 📚 Uso del Sistema
-
-### Para Asesores
-
-1. Iniciar sesión con credenciales de Asesor
-2. Crear nueva solicitud desde el menú
-3. Seleccionar tipo de formulario
-4. Completar información del solicitante
-5. Subir documentos requeridos
-6. Visualizar solo solicitudes activas (no finalizadas)
-
-### Para Gerentes
-
-1. Ver todas las solicitudes (incluidas finalizadas)
-2. Cambiar estatus de solicitudes
-3. Acceder al módulo financiero
-4. Registrar costos y pagos
-5. Generar reportes
-6. Finalizar solicitudes
-
-### Para Administradores
-
-1. Todas las funciones de Gerente
-2. Crear y editar formularios dinámicos
-3. Gestionar usuarios del sistema
-4. Configurar parámetros globales
-5. Ver logs de errores
-6. Gestionar dispositivos IoT (HikVision, Shelly)
-
-## 🔧 Configuración Avanzada
-
-### URL Amigables
-
-El sistema detecta automáticamente la URL base. Si necesita instalarlo en un subdirectorio:
-
-```
-http://localhost/misubdirectorio/CRMIntranet/
-```
-
-No requiere configuración adicional.
-
-### Cambiar Colores del Sistema
-
-1. Login como Administrador
-2. Ir a Configuración > Personalización
-3. Modificar colores primarios y secundarios
-
-### Integración con PayPal
-
-1. Ir a Configuración > Módulo Financiero
-2. Ingresar Client ID y Secret de PayPal
-3. Guardar configuración
+> Cambia las contraseñas inmediatamente después de instalar.
 
 ## 🐛 Resolución de Problemas
 
-### Error de conexión a la base de datos
-
-- Verificar credenciales en `/config/config.php`
-- Confirmar que MySQL esté ejecutándose
-- Verificar que la base de datos `crm_visas` exista
-
-### URLs no funcionan (404)
-
-- Verificar que `mod_rewrite` esté habilitado en Apache
-- Revisar que los archivos `.htaccess` existan
-- En httpd.conf, cambiar `AllowOverride None` a `AllowOverride All`
-
-### No se pueden subir archivos
-
-- Verificar permisos del directorio `public/uploads`
-- Aumentar `upload_max_filesize` en `php.ini` si es necesario
-
-### Página de login muestra en blanco
-
-- Verificar logs de error de PHP
-- Revisar que todas las extensiones PHP estén instaladas
-- Ver el archivo `/error.log`
-
-## 📖 Documentación Adicional
-
-### Flujo de Estatus de Solicitudes
-
-1. **Creado** - Solicitud registrada por Asesor
-2. **En revisión** - Gerente/Admin revisa documentación
-3. **Información incompleta** - Requiere datos adicionales
-4. **Documentación validada** - Documentos aprobados
-5. **En proceso** - Trámite en curso
-6. **Aprobado** - Trámite aprobado
-7. **Rechazado** - Trámite rechazado
-8. **Finalizado** - Trámite entregado (invisible para Asesores)
-
-### Estados Financieros
-
-- **Pendiente** - Sin pagos registrados
-- **Parcial** - Pago parcial realizado
-- **Pagado** - Completamente pagado
-
-## 🤝 Contribución
-
-Para contribuir al proyecto:
-
-1. Fork el repositorio
-2. Crear una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abrir un Pull Request
-
-## 📄 Licencia
-
-Este proyecto es de código abierto y está disponible bajo la licencia MIT.
-
-## 📞 Soporte
-
-Para soporte técnico o consultas:
-
-- **Email**: admin@crmvisas.com
-- **Teléfono**: 442-123-4567
-- **Horario**: Lunes a Viernes 9:00 AM - 6:00 PM
+| Problema | Solución |
+|----------|----------|
+| Error de conexión a BD | Verificar credenciales en `/config/config.php` |
+| URLs 404 | Habilitar `mod_rewrite` en Apache, verificar `.htaccess` |
+| No se suben archivos | Permisos en `public/uploads/`, `upload_max_filesize` en php.ini |
+| Formulario embebido no carga | Verificar la URL del API en `dynamic_form.php` |
+| Campos condicionales en páginas incorrectas | Asegurarse de que cada grupo tenga un Encabezado antes de sus campos |
 
 ---
 
-Desarrollado con ❤️ siguiendo la filosofía VIBE CODING - Sistema CRM Visas y Pasaportes Querétaro
+## 📄 Licencia
+
+Código abierto bajo licencia MIT.
+
+---
+
+Desarrollado con ❤️ — Constructor de Formularios Dinámicos
