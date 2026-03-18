@@ -65,16 +65,18 @@ Diseñado para integrarse con **cualquier sitio web** que necesite un formulario
 
 ### Estructura esperada en el servidor
 
+El constructor puede vivir en **cualquier subcarpeta** dentro de la raíz del dominio. La ruta recomendada por convención es `/sistema/`, pero si ya existe contenido en esa ruta, simplemente crea otra carpeta (por ejemplo `/constructor/`, `/forms-admin/`, `/panel/`, etc.). **El proyecto detecta automáticamente su ubicación** mediante `getBaseUrl()` en `config.php`, sin necesidad de configurar rutas manualmente.
+
 ```
-public_html/                    ← Raíz del dominio (sitio principal)
-├── index.php                   ← Tu sitio web
-├── contact.php                 ← Página que embebe el formulario
+public_html/                         ← Raíz del dominio (sitio principal)
+├── index.php                        ← Tu sitio web
+├── contact.php                      ← Página que embebe el formulario
 ├── includes/
-│   └── dynamic_form.php        ← Renderizador del formulario embebido
-├── send_quote.php              ← Procesador de submissions
-└── sistema/                    ← Constructor de formularios (este proyecto)
+│   └── dynamic_form.php             ← Renderizador del formulario embebido
+├── send_quote.php                   ← Procesador de submissions
+└── <carpeta-del-constructor>/       ← Ej: sistema/, constructor/, panel/, etc.
     ├── public/
-    │   ├── index.php           ← Punto de entrada del constructor
+    │   ├── index.php                ← Punto de entrada del constructor
     │   ├── api/
     │   │   └── get-published-form.php  ← API que sirve el formulario
     │   ├── js/
@@ -85,22 +87,22 @@ public_html/                    ← Raíz del dominio (sitio principal)
     │   ├── views/
     │   └── ...
     └── config/
-        ├── config.php          ← Credenciales BD y configuración
-        └── database.php        ← Conexión PDO
+        ├── config.php               ← Credenciales BD y configuración
+        └── database.php             ← Conexión PDO
 ```
 
-> **Importante**: El constructor vive en `/sistema/` dentro de la raíz del dominio. El sitio que consume el formulario vive en la raíz (`/public_html/`).
+> **Nota**: Si `/sistema/` ya está ocupada por otro sistema en tu hosting, crea una carpeta con otro nombre y sube el proyecto ahí. El constructor se adapta automáticamente — no hay rutas internas hardcodeadas.
 
 ### Paso 1: Subir el constructor
 
-1. Sube la carpeta completa del proyecto a `/public_html/sistema/`
-2. El punto de entrada del constructor será: `https://tudominio.com/sistema/public/`
+1. Sube la carpeta completa del proyecto a una subcarpeta dentro de `public_html/` (ej: `sistema/`, `constructor/`, `panel/`, etc.)
+2. El punto de entrada del constructor será: `https://tudominio.com/<tu-carpeta>/public/`
 
 ### Paso 2: Configurar la Base de Datos
 
 1. Crea una base de datos MySQL desde cPanel
 2. Importa `database/schema.sql`
-3. Edita `/sistema/config/config.php`:
+3. Edita `<tu-carpeta>/config/config.php`:
 
 ```php
 define('DB_HOST', 'localhost');
@@ -112,13 +114,13 @@ define('DB_PASS', 'tu_contraseña');
 ### Paso 3: Permisos
 
 ```bash
-chmod -R 755 sistema/public/uploads
+chmod -R 755 <tu-carpeta>/public/uploads
 ```
 
 ### Paso 4: Acceder al constructor
 
 ```
-https://tudominio.com/sistema/
+https://tudominio.com/<tu-carpeta>/
 ```
 
 ---
@@ -130,12 +132,12 @@ El constructor expone una **API REST** que tu sitio consume para obtener la defi
 ### Mecanismo de integración
 
 ```
-Tu sitio (raíz)                         Constructor (/sistema/)
-─────────────────                       ─────────────────────────
+Tu sitio (raíz)                         Constructor (/<tu-carpeta>/)
+─────────────────                       ──────────────────────────────
 contact.php                              
   └─ includes/dynamic_form.php          
        │                                
-       ├── [GET] cURL ──────────────►  /sistema/public/api/get-published-form.php
+       ├── [GET] cURL ──────────────►  /<tu-carpeta>/public/api/get-published-form.php
        │       ◄──── JSON ──────────   (devuelve campos, páginas, paginación)
        │                                
        └── Renderiza HTML/JS            
@@ -150,27 +152,24 @@ Usuario llena y envía
 
 ### Qué cambiar en `dynamic_form.php` (tu sitio)
 
-La URL de la API está en la línea ~12. Cámbiala a tu dominio:
+La URL de la API está en la línea ~12. Cámbiala a tu dominio y a la carpeta donde subiste el constructor:
 
 ```php
-// ANTES (hardcodeado)
-$apiUrl = 'https://landscapeinaustin.com/sistema/public/api/get-published-form.php';
-
-// DESPUÉS (tu dominio)
-$apiUrl = 'https://tudominio.com/sistema/public/api/get-published-form.php';
+// Ajusta el dominio y la carpeta del constructor
+$apiUrl = 'https://tudominio.com/<tu-carpeta>/public/api/get-published-form.php';
 ```
 
 ### Qué cambiar en `send_quote.php` (tu sitio)
 
-Este archivo carga la configuración del constructor para guardar en la misma BD:
+Este archivo carga la configuración del constructor para guardar en la misma BD. Ajusta la ruta a donde vive tu constructor:
 
 ```php
-// Línea ~17-18: Ruta al config del constructor
-$configPath = __DIR__ . '/sistema/config/config.php';
-$databasePath = __DIR__ . '/sistema/config/database.php';
+// Ruta al config del constructor (ajusta <tu-carpeta>)
+$configPath = __DIR__ . '/<tu-carpeta>/config/config.php';
+$databasePath = __DIR__ . '/<tu-carpeta>/config/database.php';
 ```
 
-> Si tu constructor está en otra ruta, ajusta estas líneas.
+> Estos son los **únicos archivos externos** que necesitan conocer la ruta del constructor. Dentro del constructor mismo, todo se detecta automáticamente.
 
 ### Archivos necesarios en tu sitio (raíz)
 
@@ -262,8 +261,9 @@ constructor-formularios/
 | Error de conexión a BD | Verificar credenciales en `/config/config.php` |
 | URLs 404 | Habilitar `mod_rewrite` en Apache, verificar `.htaccess` |
 | No se suben archivos | Permisos en `public/uploads/`, `upload_max_filesize` en php.ini |
-| Formulario embebido no carga | Verificar la URL del API en `dynamic_form.php` |
+| Formulario embebido no carga | Verificar que la URL del API en `dynamic_form.php` apunte a la carpeta correcta del constructor |
 | Campos condicionales en páginas incorrectas | Asegurarse de que cada grupo tenga un Encabezado antes de sus campos |
+| Cambié la carpeta del constructor | Solo necesitas actualizar las rutas en `dynamic_form.php` y `send_quote.php` de tu sitio. El constructor se auto-detecta. |
 
 ---
 
