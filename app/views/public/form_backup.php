@@ -165,7 +165,7 @@
                                <?= !empty($field['required']) ? 'required' : '' ?>
                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         <p class="text-xs text-gray-500 mt-1">
-                            <i class="fas fa-info-circle"></i> Formatos: PDF, JPG, PNG, DOC, DOCX (Máx. 10MB)
+                            <i class="fas fa-info-circle"></i> Formats: PDF, JPG, PNG, DOC, DOCX (Max. 10MB)
                         </p>
                     <?php endif; ?>
                 </div>
@@ -174,7 +174,7 @@
                 <!-- Auto-save status -->
                 <div id="autosave-status" class="text-sm text-gray-500 text-center hidden">
                     <i class="fas fa-cloud-upload-alt mr-1"></i>
-                    <span id="autosave-text">Guardando...</span>
+                    <span id="autosave-text">Saving...</span>
                 </div>
                 
                 <!-- Action Buttons -->
