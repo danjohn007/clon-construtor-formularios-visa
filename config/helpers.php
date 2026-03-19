@@ -258,7 +258,7 @@ function sendAppointmentNotificationEmail($applicationId, $type, $appointmentDat
     $smtpUser     = $config['smtp_user']     ?? '';
     $smtpPassword = $config['smtp_password'] ?? '';
     $smtpPort     = (int)($config['smtp_port'] ?? 465);
-    $siteName     = $config['site_name']     ?? (defined('SITE_NAME') ? SITE_NAME : 'CRM Visas');
+    $siteName     = $config['site_name']     ?? (defined('SITE_NAME') ? SITE_NAME : 'Landscape in Austin');
 
     if (empty($smtpHost) || empty($smtpUser) || empty($smtpPassword)) {
         error_log("Incomplete SMTP config — skipping appointment email for application #$applicationId.");
