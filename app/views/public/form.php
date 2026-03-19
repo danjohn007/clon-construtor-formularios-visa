@@ -459,17 +459,16 @@ $contactInfo = [
                                 </div>
                             
                             <?php elseif ($field['type'] === 'file'): ?>
-                                <?php $isMultiple = !empty($field['multiple']); ?>
                                 <input type="file" 
-                                       name="<?= htmlspecialchars($field['id']) ?><?= $isMultiple ? '[]' : '' ?>"
+                                       name="<?= htmlspecialchars($field['id']) ?>[]"
                                        id="field_<?= htmlspecialchars($field['id']) ?>"
                                        data-label="<?= htmlspecialchars($field['label']) ?>"
-                                       <?= $isMultiple ? 'multiple' : '' ?>
+                                       multiple
                                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt,.xlsx,.xls"
                                        <?= !empty($field['required']) ? 'required' : '' ?>
                                        class="form-input w-full file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
                                 <p class="text-xs text-gray-500 mt-2">
-                                    <i class="fas fa-info-circle"></i> Formats: PDF, JPG, PNG, DOC, DOCX (Max. 10MB)
+                                    <i class="fas fa-info-circle"></i> Formats: PDF, JPG, PNG, DOC, DOCX (Max. 10MB) — You can select multiple files
                                 </p>
                             <?php endif; ?>
                         <?php endif; ?>
