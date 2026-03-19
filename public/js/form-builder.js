@@ -6,7 +6,7 @@ class FormBuilder {
     constructor(containerId, initialData = null, initialPages = null) {
         this.container = document.getElementById(containerId);
         this.fields = [];
-        this.pages = [{ id: 1, name: 'Página 1', fieldIds: [] }];
+        this.pages = [{ id: 1, name: 'Page 1', fieldIds: [] }];
         this.currentPage = 1;
         this.paginationEnabled = false;
         this.draggedElement = null;
@@ -82,7 +82,7 @@ class FormBuilder {
                     // Resetear páginas con los campos existentes en la primera página
                     this.pages = [{
                         id: 1,
-                        name: 'Página 1',
+                        name: 'Page 1',
                         fieldIds: this.fields.map(field => field.id)
                     }];
                     this.currentPage = 1;
@@ -92,7 +92,7 @@ class FormBuilder {
                 
                 // Si se desactiva la paginación, limpiar las páginas
                 if (!this.paginationEnabled && wasEnabled) {
-                    this.pages = [{ id: 1, name: 'Página 1', fieldIds: [] }];
+                    this.pages = [{ id: 1, name: 'Page 1', fieldIds: [] }];
                     this.currentPage = 1;
                     this.nextPageId = 2;
                 }
@@ -181,13 +181,13 @@ class FormBuilder {
     
     getPageName(pageId) {
         const page = this.pages.find(p => p.id === pageId);
-        return page ? page.name : 'Página desconocida';
+        return page ? page.name : 'Page unknown';
     }
     
     addPage() {
         const newPage = {
             id: this.nextPageId++,
-            name: `Página ${this.pages.length + 1}`,
+            name: `Page ${this.pages.length + 1}`,
             fieldIds: []
         };
         this.pages.push(newPage);
