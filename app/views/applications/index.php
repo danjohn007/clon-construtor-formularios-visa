@@ -13,19 +13,7 @@ $isAsesorRole = $_SESSION['user_role'] === ROLE_ASESOR;
 
 <!-- Filtros -->
 <div class="bg-white rounded-lg shadow p-4 mb-4 md:mb-6">
-    <form method="GET" action="<?= BASE_URL ?>/solicitudes" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Formulario</label>
-            <select name="form_id" class="w-full border border-gray-300 rounded-lg px-3 md:px-4 py-2 text-sm md:text-base">
-                <option value="">Todos los formularios</option>
-                <?php foreach ($forms as $form): ?>
-                    <option value="<?= $form['id'] ?>" <?= $formId == $form['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($form['name']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        
+    <form method="GET" action="<?= BASE_URL ?>/solicitudes" class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Estatus</label>
             <select name="status" class="w-full border border-gray-300 rounded-lg px-3 md:px-4 py-2 text-sm md:text-base">
@@ -42,7 +30,7 @@ $isAsesorRole = $_SESSION['user_role'] === ROLE_ASESOR;
             <input type="text" 
                    name="search" 
                    value="<?= htmlspecialchars($search) ?>"
-                   placeholder="Nombre, email o folio"
+                   placeholder="Folio o cualquier dato del formulario"
                    class="w-full border border-gray-300 rounded-lg px-3 md:px-4 py-2 text-sm md:text-base">
         </div>
         
@@ -63,7 +51,6 @@ $isAsesorRole = $_SESSION['user_role'] === ROLE_ASESOR;
                     <th class="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Folio</th>
                     <th class="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Solicitante</th>
                     <th class="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Formulario</th>
-                    <th class="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
                     <th class="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
                     <th class="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Origen</th>
                     <th class="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
@@ -105,16 +92,6 @@ $isAsesorRole = $_SESSION['user_role'] === ROLE_ASESOR;
                         <span class="text-sm text-gray-700">
                             <?= htmlspecialchars($app['form_display_name'] ?: 'N/A') ?>
                         </span>
-                    </td>
-                    <td class="px-3 md:px-6 py-4">
-                        <div class="flex flex-col text-xs text-gray-600">
-                            <?php if (!empty($app['applicant_email'])): ?>
-                                <span title="Email"><i class="fas fa-envelope mr-1 text-gray-400"></i><?= htmlspecialchars($app['applicant_email']) ?></span>
-                            <?php endif; ?>
-                            <?php if (!empty($app['applicant_phone'])): ?>
-                                <span title="Teléfono"><i class="fas fa-phone mr-1 text-gray-400"></i><?= htmlspecialchars($app['applicant_phone']) ?></span>
-                            <?php endif; ?>
-                        </div>
                     </td>
                     <td class="px-3 md:px-6 py-4">
                         <span class="px-2 py-1 text-xs rounded-full font-medium <?= $statusClass ?>">

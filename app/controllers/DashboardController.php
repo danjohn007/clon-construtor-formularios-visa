@@ -119,50 +119,62 @@ class DashboardController extends BaseController {
             }
             $stats['applications_by_month'] = $stmt->fetchAll();
             
-            // Datos para gráfica de tipos de solicitudes
+            // Datos para gráfica de tipos de solicitudes (por nombre de formulario)
             if ($role === ROLE_ASESOR) {
                 $stmt = $this->db->prepare("
-                    SELECT type, COUNT(*) as count
+                    SELECT form_name, COUNT(*) as count
                     FROM applications
                     WHERE status NOT IN (?, ?)
-                    GROUP BY type
+                    GROUP BY form_name
                 ");
                 $stmt->execute([STATUS_FINALIZADO, STATUS_RECHAZADO]);
             } else {
                 $stmt = $this->db->query("
-                    SELECT type, COUNT(*) as count
+                    SELECT form_name, COUNT(*) as count
                     FROM applications
-                    GROUP BY type
+                    GROUP BY form_name
                 ");
             }
             $stats['applications_by_type'] = $stmt->fetchAll();
 
-            // Datos para calendario de citas (solicitudes con cita programada)
+            // Datos para calendario de citas
+            // NOTA: Esta funcionalidad requiere campos del esquema antiguo (appointment_date, etc.)
+            // Si tu base de datos usa el esquema nuevo simplificado, el calendario estará vacío.
+            // Para habilitar citas, agrega estos campos a la tabla applications o extráelos de form_data JSON.
             try {
-                $appointmentSql = "
-                    SELECT a.id, a.folio, a.appointment_date, a.canadian_biometric_date,
-                           a.is_canadian_visa, a.type, a.subtype,
-                           a.appointment_confirmed_day_before,
-                           u.full_name as creator_name
-                    FROM applications a
-                    LEFT JOIN users u ON a.created_by = u.id
-                    WHERE a.status = ?
-                      AND (
-                        (COALESCE(a.is_canadian_visa, 0) = 0 AND a.appointment_date IS NOT NULL)
-                        OR (a.is_canadian_visa = 1 AND a.canadian_biometric_date IS NOT NULL)
-                      )
-                ";
-                $appointmentParams = [STATUS_CITA_PROGRAMADA];
+                // Verificar si la columna appointment_date existe en la tabla
+                $checkColumn = $this->db->query("SHOW COLUMNS FROM applications LIKE 'appointment_date'");
+                $hasAppointmentColumns = $checkColumn->rowCount() > 0;
+                
+                if ($hasAppointmentColumns) {
+                    $appointmentSql = "
+                        SELECT a.id, a.folio, a.appointment_date, a.canadian_biometric_date,
+                               a.is_canadian_visa, a.type, a.subtype,
+                               a.appointment_confirmed_day_before,
+                               u.full_name as creator_name
+                        FROM applications a
+                        LEFT JOIN users u ON a.created_by = u.id
+                        WHERE a.status = ?
+                          AND (
+                            (COALESCE(a.is_canadian_visa, 0) = 0 AND a.appointment_date IS NOT NULL)
+                            OR (a.is_canadian_visa = 1 AND a.canadian_biometric_date IS NOT NULL)
+                          )
+                    ";
+                    $appointmentParams = [STATUS_CITA_PROGRAMADA];
 
-                if ($role === ROLE_ASESOR) {
-                    $appointmentSql .= " AND a.created_by = ?";
-                    $appointmentParams[] = $userId;
+                    if ($role === ROLE_ASESOR) {
+                        $appointmentSql .= " AND a.created_by = ?";
+                        $appointmentParams[] = $userId;
+                    }
+                    $appointmentSql .= " ORDER BY COALESCE(a.canadian_biometric_date, a.appointment_date) ASC";
+
+                    $stmt = $this->db->prepare($appointmentSql);
+                    $stmt->execute($appointmentParams);
+                    $stats['appointments'] = $stmt->fetchAll();
+                } else {
+                    // Esquema nuevo: no hay columnas de citas
+                    $stats['appointments'] = [];
                 }
-                $appointmentSql .= " ORDER BY COALESCE(a.canadian_biometric_date, a.appointment_date) ASC";
-
-                $stmt = $this->db->prepare($appointmentSql);
-                $stmt->execute($appointmentParams);
-                $stats['appointments'] = $stmt->fetchAll();
             } catch (PDOException $e) {
                 $stats['appointments'] = [];
             }

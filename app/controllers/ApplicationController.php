@@ -14,7 +14,6 @@ class ApplicationController extends BaseController {
         
         // Filtros
         $status = $_GET['status'] ?? '';
-        $formId = $_GET['form_id'] ?? '';
         $search = $_GET['search'] ?? '';
         
         try {
@@ -34,16 +33,16 @@ class ApplicationController extends BaseController {
                 $params[] = $status;
             }
             
-            // Filtro por formulario
-            if (!empty($formId)) {
-                $where[] = "a.form_id = ?";
-                $params[] = $formId;
-            }
-            
-            // Búsqueda por nombre, email o folio
+            // Búsqueda mejorada: nombre, email, folio O dentro del JSON form_data
             if (!empty($search)) {
-                $where[] = "(a.applicant_name LIKE ? OR a.applicant_email LIKE ? OR a.folio LIKE ?)";
+                $where[] = "(
+                    a.applicant_name LIKE ? OR 
+                    a.applicant_email LIKE ? OR 
+                    a.folio LIKE ? OR
+                    a.form_data LIKE ?
+                )";
                 $searchTerm = "%$search%";
+                $params[] = $searchTerm;
                 $params[] = $searchTerm;
                 $params[] = $searchTerm;
                 $params[] = $searchTerm;
@@ -71,32 +70,21 @@ class ApplicationController extends BaseController {
             $stmt->execute($params);
             $applications = $stmt->fetchAll();
             
-            // Obtener lista de formularios para filtro
-            $stmt = $this->db->query("
-                SELECT DISTINCT f.id, f.name 
-                FROM forms f
-                INNER JOIN applications a ON f.id = a.form_id
-                ORDER BY f.name
-            ");
-            $forms = $stmt->fetchAll();
-            
             $totalPages = ceil($total / $limit);
             
             $this->view('applications/index', [
                 'applications' => $applications,
-                'forms' => $forms,
                 'page' => $page,
                 'totalPages' => $totalPages,
                 'total' => $total,
                 'status' => $status,
-                'formId' => $formId,
                 'search' => $search
             ]);
             
         } catch (PDOException $e) {
             error_log("Error en listado de solicitudes: " . $e->getMessage());
             $_SESSION['error'] = 'Error al cargar solicitudes';
-            $this->view('applications/index', ['applications' => [], 'forms' => []]);
+            $this->view('applications/index', ['applications' => []]);
         }
     }
     

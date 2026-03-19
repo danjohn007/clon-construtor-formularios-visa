@@ -166,7 +166,7 @@ ob_start();
                         <span class="font-mono text-xs md:text-sm text-primary"><?= htmlspecialchars($app['folio']) ?></span>
                     </td>
                     <td class="px-3 md:px-6 py-4 whitespace-nowrap">
-                        <span class="text-xs md:text-sm text-gray-700"><?= htmlspecialchars($app['type']) ?></span>
+                        <span class="text-xs md:text-sm text-gray-700"><?= htmlspecialchars($app['form_name'] ?? 'Formulario') ?></span>
                     </td>
                     <td class="px-3 md:px-6 py-4 whitespace-nowrap">
                         <span class="px-2 py-1 text-xs rounded-full <?= 
@@ -178,7 +178,7 @@ ob_start();
                         </span>
                     </td>
                     <td class="px-3 md:px-6 py-4 whitespace-nowrap text-xs md:text-sm text-gray-700 hidden md:table-cell">
-                        <?= htmlspecialchars($app['creator_name']) ?>
+                        <?= htmlspecialchars($app['creator_name'] ?? ($app['is_public_submission'] ? 'Cliente (Público)' : 'N/A')) ?>
                     </td>
                     <td class="px-3 md:px-6 py-4 whitespace-nowrap text-xs md:text-sm text-gray-500">
                         <?= date('d/m/Y', strtotime($app['created_at'])) ?>
@@ -298,14 +298,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     <?php endif; ?>
     
-    // Chart 3: Type Bar Chart
+    // Chart 3: Type Bar Chart (por nombre de formulario)
     <?php if (!empty($stats['applications_by_type'])): ?>
     const typeCtx = document.getElementById('typeChart');
     if (typeCtx) {
         new Chart(typeCtx, {
             type: 'bar',
             data: {
-                labels: <?= json_encode(array_column($stats['applications_by_type'], 'type')) ?>,
+                labels: <?= json_encode(array_column($stats['applications_by_type'], 'form_name')) ?>,
                 datasets: [{
                     label: 'Solicitudes',
                     data: <?= json_encode(array_column($stats['applications_by_type'], 'count')) ?>,
@@ -336,6 +336,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Calendar for appointments
     const appointments = <?= json_encode(array_map(function($a) {
+        // Para esquema nuevo, estos campos pueden no existir - usar form_name como tipo
         $date = (!empty($a['is_canadian_visa']) && !empty($a['canadian_biometric_date']))
             ? $a['canadian_biometric_date']
             : ($a['appointment_date'] ?? '');
@@ -343,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'id' => $a['id'],
             'folio' => $a['folio'] ?? '',
             'date' => substr($date, 0, 10),
-            'type' => $a['type'] ?? '',
+            'type' => $a['form_name'] ?? $a['type'] ?? 'Formulario',
             'subtype' => $a['subtype'] ?? '',
             'creator' => $a['creator_name'] ?? '',
             'confirmed' => (bool)($a['appointment_confirmed_day_before'] ?? false),
